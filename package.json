@@ -2,13 +2,28 @@
   "name": "qualia",
   "version": "0.0.2",
   "description": "",
-  "main": "index.js",
+  "license": "UNLICENSED",
+  "author": "Afshin T. Darian <qualia@darian.af>",
   "repository": {
     "url": "https://github.com/ursiform/qualia"
   },
+  "files": [
+    "lib/**/*.{d.ts,eot,gif,html,jpg,js,js.map,json,png,svg,woff2,ttf}",
+    "style/**/*.{css,eot,gif,html,jpg,json,png,svg,woff2,ttf}"
+  ],
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc --build",
+    "clean": "rimraf lib && rimraf node_modules",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "watch": "tsc -w --listEmittedFiles"
   },
-  "author": "Afshin T. Darian <qualia@darian.af>",
-  "license": "UNLICENSED"
+  "devDependencies": {
+    "prettier": "^1.19.1",
+    "rimraf": "^3.0.2",
+    "tslint": "^5.0.0",
+    "tslint-plugin-prettier": "^2.1.0",
+    "typescript": "^3.7.4"
+  }
 }
