@@ -3,6 +3,10 @@
 import { Qualia } from './qualia';
 
 export abstract class Neuron {
-  abstract type: 'interneuron' | 'motor' | 'sensory';
+  abstract type: Neuron.Type;
   abstract async tick(input: Qualia.Matrix): Promise<Qualia.Matrix>;
+}
+
+export namespace Neuron {
+  export type Type = 'interneuron' | 'motor' | 'sensory';
 }
