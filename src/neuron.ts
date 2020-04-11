@@ -3,7 +3,7 @@
 import { Qualia } from './qualia';
 
 export abstract class Neuron {
-  abstract type: Neuron.Type;
+  abstract readonly type: Neuron.Type;
   abstract async tick(input: Qualia.Matrix): Promise<Qualia.Matrix>;
 }
 
