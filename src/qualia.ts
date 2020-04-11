@@ -2,10 +2,5 @@
 
 export namespace Qualia {
   export const version = '0.0.2';
-  export type Input = number[];
-  export type Neuron = {
-    inputs: Input[];
-    outputs: Output[];
-  };
-  export type Output = number[];
+  export type Matrix = (1 | 0)[][];
 }
