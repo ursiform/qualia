@@ -4,7 +4,7 @@ import { Neuron } from './neuron';
 import { Qualia } from './qualia';
 
 export class MotorNeuron extends Neuron {
-  type: Neuron.Type = 'motor';
+  readonly type: Neuron.Type = 'motor';
   async tick(input: Qualia.Matrix): Promise<Qualia.Matrix> {
     return input;
   }
