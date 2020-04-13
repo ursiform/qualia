@@ -21,6 +21,7 @@ export abstract class Neuron implements IObservableDisposable {
     }
     this._isDisposed = true;
     this._disposed.emit(undefined);
+    Signal.clearData(this);
   }
 
   abstract async tick(input: Qualia.Matrix): Promise<Qualia.Matrix>;
