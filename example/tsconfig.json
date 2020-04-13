@@ -18,5 +18,5 @@
     "target": "ES2015",
     "types": []
   },
-  "exclude": ["example", "lib"]
+  "exclude": ["lib"]
 }
