@@ -1,0 +1,16 @@
+/* (c) Copyright Afshin T. Darian 2020. All Rights Reserved. */
+
+body {
+  background: lavenderblush;
+}
+
+main {
+  background-color: lemonchiffon;
+  font-size: 2.5em;
+}
+
+header {
+  color: firebrick;
+  font-weight: bold;
+  font-family: monospace, sans-serif;
+}

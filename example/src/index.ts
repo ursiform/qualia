@@ -1,5 +1,12 @@
 // (c) Copyright Afshin T. Darian 2020. All Rights Reserved.
 
 import { Qualia } from 'qualia';
+import '../index.css';
 
-console.log(`Running qualia version ${Qualia.version}`);
+function main() {
+  const header = document.querySelector('main header')!;
+
+  header.textContent = `qualia v${Qualia.version}`;
+}
+
+window.addEventListener('load', main);

@@ -1,6 +1,6 @@
 // (c) Copyright Afshin T. Darian 2020. All Rights Reserved.
 
-import { UUID } from '@lumino/coreutils';
+import { UUID, ReadonlyJSONObject } from '@lumino/coreutils';
 import { IObservableDisposable } from '@lumino/disposable';
 import { ISignal, Signal } from '@lumino/signaling';
 
@@ -36,18 +36,18 @@ export class Graph<T extends IObservableDisposable>
     this._disposed.emit(undefined);
   }
 
-  link(a: string, b: string) {
+  link(src: string, dest: string, metadata?: ReadonlyJSONObject) {
     const { graph } = this;
 
-    if (!graph.has(a)) {
-      throw new ReferenceError(`Graph#link: ${a} does not exist.`);
+    if (!graph.has(src)) {
+      throw new ReferenceError(`Graph#link: ${src} does not exist.`);
     }
-    if (!graph.has(b)) {
-      throw new ReferenceError(`Graph#link: ${b} does not exist.`);
+    if (!graph.has(dest)) {
+      throw new ReferenceError(`Graph#link: ${dest} does not exist.`);
     }
 
-    graph.get(a)!.out.set(b);
-    graph.get(b)!.in.set(a);
+    graph.get(src)!.out.set(dest, metadata || undefined);
+    graph.get(dest)!.in.set(src, metadata || undefined);
   }
 
   remove(key: string) {
@@ -60,41 +60,36 @@ export class Graph<T extends IObservableDisposable>
 
     const node = graph.get(key)!;
 
-    node.in.forEach((_, peer) => {
-      this.unlink(key, peer);
+    node.in.forEach((_, src) => {
+      this.unlink(src, key);
     });
-    node.out.forEach((_, peer) => {
-      this.unlink(key, peer);
+    node.out.forEach((_, dest) => {
+      this.unlink(key, dest);
     });
     graph.delete(key);
     Signal.disconnectBetween(node, this);
   }
 
-  unlink(a: string, b: string) {
+  unlink(src: string, dest: string) {
     const { graph } = this;
 
-    if (!graph.has(a)) {
-      throw new ReferenceError(`Graph#unlink: ${a} does not exist.`);
+    if (!graph.has(src)) {
+      throw new ReferenceError(`Graph#unlink: ${src} does not exist.`);
     }
-    if (!graph.has(b)) {
-      throw new ReferenceError(`Graph#unlink: ${b} does not exist.`);
+    if (!graph.has(dest)) {
+      throw new ReferenceError(`Graph#unlink: ${dest} does not exist.`);
     }
 
-    const one = graph.get(a)!;
-    const two = graph.get(b)!;
-
-    one.in.delete(b);
-    one.out.delete(b);
-    two.in.delete(a);
-    two.out.delete(a);
+    graph.get(src)!.out.delete(dest);
+    graph.get(dest)!.in.delete(src);
   }
 
   protected graph = new Map<
     string,
     {
       node: T;
-      in: Map<string, void>;
-      out: Map<string, void>;
+      in: Map<string, ReadonlyJSONObject | undefined>;
+      out: Map<string, ReadonlyJSONObject | undefined>;
     }
   >();
 
