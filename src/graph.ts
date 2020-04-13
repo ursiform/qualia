@@ -1,6 +1,6 @@
 // (c) Copyright Afshin T. Darian 2020. All Rights Reserved.
 
-import { UUID, ReadonlyJSONObject } from '@lumino/coreutils';
+import { ReadonlyJSONObject, UUID } from '@lumino/coreutils';
 import { IObservableDisposable } from '@lumino/disposable';
 import { ISignal, Signal } from '@lumino/signaling';
 
@@ -32,6 +32,9 @@ export class Graph<T extends IObservableDisposable>
     if (this._isDisposed) {
       return;
     }
+    this.graph.forEach((item) => {
+      item.node.dispose();
+    });
     this._isDisposed = true;
     this._disposed.emit(undefined);
   }
