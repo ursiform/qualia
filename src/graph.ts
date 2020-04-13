@@ -15,11 +15,10 @@ export class Graph<T extends IObservableDisposable>
   }
 
   add(node: T, id = UUID.uuid4()) {
-    if (this.data.has(id)) {
+    if (this.nodes.has(id)) {
       return;
     }
-    this.data.set(id, node);
-    this.graph.set(id, Object.create(null));
+    this.nodes.set(id, { node, edges: new Map() });
   }
 
   dispose() {
@@ -31,27 +30,26 @@ export class Graph<T extends IObservableDisposable>
   }
 
   link(a: string, b: string) {
-    if (!this.data.has(a)) {
+    if (!this.nodes.has(a)) {
       throw new ReferenceError(`Graph#link: ${a} does not exist.`);
     }
-    if (!this.data.has(b)) {
+    if (!this.nodes.has(b)) {
       throw new ReferenceError(`Graph#link: ${b} does not exist.`);
     }
-    this.graph.get(a)![b] = null;
+    this.nodes.get(a)!.edges.set(b);
   }
 
   unlink(a: string, b: string) {
-    if (!this.data.has(a)) {
+    if (!this.nodes.has(a)) {
       throw new ReferenceError(`Graph#unlink: ${a} does not exist.`);
     }
-    if (!this.data.has(b)) {
+    if (!this.nodes.has(b)) {
       throw new ReferenceError(`Graph#unlink: ${b} does not exist.`);
     }
-    delete this.graph.get(a)![b];
+    this.nodes.get(a)!.edges.delete(b);
   }
 
-  protected data = new Map<string, T>();
-  protected graph = new Map<string, { [id: string]: null }>();
+  protected nodes = new Map<string, { node: T; edges: Map<string, void> }>();
 
   private _disposed = new Signal<this, void>(this);
   private _isDisposed = false;
