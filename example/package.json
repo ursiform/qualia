@@ -28,7 +28,6 @@
     "webpack-cli": "^3.3.11"
   },
   "dependencies": {
-    "qualia": "./..",
-    "whatwg-fetch": "^3.0.0"
+    "qualia": "./.."
   }
 }
