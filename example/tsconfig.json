@@ -10,7 +10,7 @@
     "noEmitOnError": true,
     "noImplicitAny": true,
     "noUnusedLocals": true,
-    "outDir": "build",
+    "outDir": "lib",
     "preserveWatchOutput": true,
     "resolveJsonModule": true,
     "sourceMap": true,
