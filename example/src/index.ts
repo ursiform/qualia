@@ -11,11 +11,12 @@ function main() {
   const connectome = new Connectome({ spec });
   const header = document.querySelector('main header') as HTMLElement;
   const figure = document.getElementById('figure');
+  const arrow = 'triangle';
   const nodes = spec.nodes.map((node, index) => ({
     data: { id: Array.isArray(node) ? node[1] : `${node}-${index}` }
   }));
   const edges = spec.edges.map(([source, target]) => ({
-    data: { id: `${source}-${target}`, source, target }
+    data: { id: `${source}-${target}`, arrow, source, target }
   }));
 
   (window as any).connectome = connectome;
@@ -26,17 +27,23 @@ function main() {
       {
         selector: 'node',
         style: {
-          'background-color': '#666',
+          'background-color': '#888888',
           label: 'data(id)'
         }
       },
       {
         selector: 'edge',
         style: {
-          width: 3,
-          'line-color': '#ccc',
-          'target-arrow-color': '#ccc',
-          'target-arrow-shape': 'triangle'
+          width: 2,
+          'curve-style': 'straight',
+          'line-color': '#aaaaaa'
+        }
+      },
+      {
+        selector: 'edge[arrow]',
+        style: {
+          'target-arrow-shape': 'triangle',
+          'target-arrow-color': '#aaaaaa'
         }
       }
     ],

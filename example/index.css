@@ -4,11 +4,6 @@ body {
   background: lavenderblush;
 }
 
-main {
-  background-color: lemonchiffon;
-  font-size: 2.5em;
-}
-
 header {
   color: firebrick;
   font-weight: bold;
@@ -18,7 +13,7 @@ header {
 }
 
 #figure {
-  background: #eeeeee;
+  background: lemonchiffon;
   position: absolute;
   top: 0;
   bottom: 0;
