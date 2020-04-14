@@ -1,7 +1,12 @@
 {
   "rulesDirectory": ["tslint-plugin-prettier"],
   "rules": {
-    "prettier": [true, { "singleQuote": true, "trailingComma": "none" }],
+    "prettier": [true, {
+      "arrowParens": "avoid",
+      "singleQuote": true,
+      "trailingComma": "none"
+      }
+  ],
     "align": [true, "parameters", "statements"],
     "await-promise": true,
     "ban": [

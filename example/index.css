@@ -13,4 +13,15 @@ header {
   color: firebrick;
   font-weight: bold;
   font-family: monospace, sans-serif;
+  position: absolute;
+  z-index: 100;
+}
+
+#figure {
+  background: #eeeeee;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
 }

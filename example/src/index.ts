@@ -1,15 +1,49 @@
 // (c) Copyright Afshin T. Darian 2020. All Rights Reserved.
 
-import { Qualia, Connectome } from 'qualia';
 import '../index.css';
+
+import cytoscape from 'cytoscape';
+import { Qualia, Connectome } from 'qualia';
 import { Specs } from './specs';
 
 function main() {
-  const header = document.querySelector('main header')!;
-  const connectome = new Connectome({ spec: Specs.alpha });
+  const spec = Specs.alpha;
+  const connectome = new Connectome({ spec });
+  const header = document.querySelector('main header') as HTMLElement;
+  const figure = document.getElementById('figure');
+  const nodes = spec.nodes.map((node, index) => ({
+    data: { id: Array.isArray(node) ? node[1] : `${node}-${index}` }
+  }));
+  const edges = spec.edges.map(([source, target]) => ({
+    data: { id: `${source}-${target}`, source, target }
+  }));
 
-  header.textContent = `qualia v${Qualia.version}`;
   (window as any).connectome = connectome;
+  cytoscape({
+    container: figure,
+    elements: nodes.concat(edges),
+    style: [
+      {
+        selector: 'node',
+        style: {
+          'background-color': '#666',
+          label: 'data(id)'
+        }
+      },
+      {
+        selector: 'edge',
+        style: {
+          width: 3,
+          'line-color': '#ccc',
+          'target-arrow-color': '#ccc',
+          'target-arrow-shape': 'triangle'
+        }
+      }
+    ],
+    layout: { name: 'grid', rows: 5 }
+  });
+  header.textContent = `qualia v${Qualia.version}`;
+  console.log('connectome', connectome);
 }
 
 window.addEventListener('load', main);
