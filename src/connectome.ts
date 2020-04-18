@@ -10,10 +10,10 @@ import { SensoryNeuron } from './sensoryneuron';
 
 export class Connectome implements IDisposable {
   constructor(options: Connectome.IOptions = {}) {
-    options.spec?.nodes.forEach((spec) => {
+    options.spec?.nodes.forEach(spec => {
       const type = Array.isArray(spec) ? spec[0] : spec;
       const key = Array.isArray(spec) ? spec[1] : undefined;
-      switch (type as Neuron.Type) {
+      switch (type) {
         case 'interneuron':
           this.graph.add(new Interneuron(), key);
           break;
@@ -38,18 +38,36 @@ export class Connectome implements IDisposable {
     return this.graph.isDisposed;
   }
 
+  dehydrate(): Connectome.Specification {
+    const dehydrated: Connectome.Specification = { edges: [], nodes: [] };
+    for (let [key, node] of this.graph.entries()) {
+      dehydrated.nodes.push([node.value.type, key]);
+      for (let [src] of node.in.entries()) {
+        dehydrated.edges.push([src, key]);
+      }
+      for (let [dest] of node.out.entries()) {
+        dehydrated.edges.push([key, dest]);
+      }
+    }
+    return dehydrated;
+  }
+
   dispose() {
     this.graph.dispose();
   }
 }
 
 export namespace Connectome {
-  export interface ISpecification extends PartialJSONObject {
-    edges: [string, string][];
-    nodes: ([string, string] | string)[];
-  }
+  export type Specification = Private.ISpecification;
 
   export interface IOptions {
-    spec?: ISpecification;
+    spec?: Specification;
+  }
+}
+
+namespace Private {
+  export interface ISpecification extends PartialJSONObject {
+    edges: [string, string][];
+    nodes: ([Neuron.Type, string] | Neuron.Type)[];
   }
 }

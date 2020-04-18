@@ -14,7 +14,11 @@ export class Graph<T extends IObservableDisposable>
     return this._isDisposed;
   }
 
-  add(node: T, key = UUID.uuid4()) {
+  get size(): number {
+    return this.graph.size;
+  }
+
+  add(value: T, key = UUID.uuid4()) {
     const { graph } = this;
 
     if (graph.has(key)) {
@@ -22,8 +26,8 @@ export class Graph<T extends IObservableDisposable>
       return;
     }
 
-    graph.set(key, { node, in: new Map(), out: new Map() });
-    node.disposed.connect(() => {
+    graph.set(key, { value, in: new Map(), out: new Map() });
+    value.disposed.connect(() => {
       this.remove(key);
     }, this);
   }
@@ -32,11 +36,15 @@ export class Graph<T extends IObservableDisposable>
     if (this._isDisposed) {
       return;
     }
-    this.graph.forEach((item) => {
-      item.node.dispose();
+    this.graph.forEach(node => {
+      node.value.dispose();
     });
     this._isDisposed = true;
     this._disposed.emit(undefined);
+  }
+
+  entries(): IterableIterator<[string, Graph.Node<T>]> {
+    return this.graph.entries();
   }
 
   link(src: string, dest: string, metadata?: ReadonlyJSONObject) {
@@ -87,15 +95,16 @@ export class Graph<T extends IObservableDisposable>
     graph.get(dest)!.in.delete(src);
   }
 
-  protected graph = new Map<
-    string,
-    {
-      node: T;
-      in: Map<string, ReadonlyJSONObject | undefined>;
-      out: Map<string, ReadonlyJSONObject | undefined>;
-    }
-  >();
+  protected graph = new Map<string, Graph.Node<T>>();
 
   private _disposed = new Signal<this, void>(this);
   private _isDisposed = false;
+}
+
+export namespace Graph {
+  export type Node<T> = {
+    value: T;
+    in: Map<string, ReadonlyJSONObject | undefined>;
+    out: Map<string, ReadonlyJSONObject | undefined>;
+  };
 }

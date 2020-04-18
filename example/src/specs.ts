@@ -3,7 +3,7 @@
 import { Connectome } from 'qualia';
 
 export namespace Specs {
-  export const alpha: Connectome.ISpecification = {
+  export const alpha: Connectome.Specification = {
     nodes: [
       ['sensory', 'S1'],
       ['motor', 'M1'],
@@ -37,7 +37,21 @@ export namespace Specs {
       ['I1', 'I7'],
       ['I1', 'I8'],
 
-      ['I2', 'I1']
+      ['I2', 'I1'],
+      ['I2', 'I3'],
+      ['I2', 'I4'],
+      ['I2', 'I5'],
+      ['I2', 'I6'],
+      ['I2', 'I7'],
+      ['I2', 'I8'],
+
+      ['I3', 'I1'],
+      ['I3', 'I2'],
+      ['I3', 'I4'],
+      ['I3', 'I5'],
+      ['I3', 'I6'],
+      ['I3', 'I7'],
+      ['I3', 'I8']
     ]
   };
 }

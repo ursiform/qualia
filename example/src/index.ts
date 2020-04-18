@@ -7,8 +7,8 @@ import { Qualia, Connectome } from 'qualia';
 import { Specs } from './specs';
 
 function main() {
-  const spec = Specs.alpha;
-  const connectome = new Connectome({ spec });
+  const connectome = new Connectome({ spec: Specs.alpha });
+  const spec = connectome.dehydrate();
   const header = document.querySelector('main header') as HTMLElement;
   const figure = document.getElementById('figure');
   const arrow = 'triangle';
@@ -43,11 +43,11 @@ function main() {
         selector: 'edge[arrow]',
         style: {
           'target-arrow-shape': 'triangle',
-          'target-arrow-color': '#aaaaaa'
+          'target-arrow-color': '#999999'
         }
       }
     ],
-    layout: { name: 'grid', rows: 5 }
+    layout: { name: 'grid', rows: 4 }
   });
   header.textContent = `qualia v${Qualia.version}`;
   console.log('connectome', connectome);
