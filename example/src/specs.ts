@@ -5,53 +5,54 @@ import { Connectome } from 'qualia';
 export namespace Specs {
   export const alpha: Connectome.Specification = {
     nodes: [
-      ['sensory', 'S1'],
-      ['motor', 'M1'],
-      ['sensory', 'S2'],
-      ['motor', 'M2'],
-      ['interneuron', 'I1'],
-      ['interneuron', 'I2'],
-      ['interneuron', 'I3'],
-      ['interneuron', 'I4'],
-      ['interneuron', 'I5'],
-      ['interneuron', 'I6'],
-      ['interneuron', 'I7'],
-      ['interneuron', 'I8']
+      ['motor', 'm-0'],
+      ['motor', 'm-1'],
+
+      ['sensory', 's-0'],
+      ['sensory', 's-1'],
+
+      ['interneuron', 'i-0'],
+      ['interneuron', 'i-1'],
+      ['interneuron', 'i-2'],
+      ['interneuron', 'i-3'],
+      ['interneuron', 'i-4'],
+      ['interneuron', 'i-5'],
+      ['interneuron', 'i-6'],
+      ['interneuron', 'i-7']
     ],
     edges: [
-      ['S1', 'M1'],
-      ['S1', 'I1'],
+      ['m-0', 's-0'],
 
-      ['S2', 'M2'],
-      ['S2', 'I1'],
+      ['m-1', 's-1'],
 
-      ['M1', 'S1'],
+      ['s-0', 'i-0'],
+      ['s-0', 'i-1'],
+      ['s-0', 'i-2'],
+      ['s-0', 'i-3'],
 
-      ['M2', 'S2'],
+      ['s-1', 'i-4'],
+      ['s-1', 'i-5'],
+      ['s-1', 'i-6'],
+      ['s-1', 'i-7'],
 
-      ['I1', 'I2'],
-      ['I1', 'I3'],
-      ['I1', 'I4'],
-      ['I1', 'I5'],
-      ['I1', 'I6'],
-      ['I1', 'I7'],
-      ['I1', 'I8'],
+      ['i-0', 'm-0'],
+      ['i-4', 'm-1'],
 
-      ['I2', 'I1'],
-      ['I2', 'I3'],
-      ['I2', 'I4'],
-      ['I2', 'I5'],
-      ['I2', 'I6'],
-      ['I2', 'I7'],
-      ['I2', 'I8'],
+      ['i-0', 'i-1'],
+      ['i-0', 'i-2'],
+      ['i-0', 'i-3'],
+      ['i-0', 'i-4'],
+      ['i-0', 'i-5'],
+      ['i-0', 'i-6'],
+      ['i-0', 'i-7'],
 
-      ['I3', 'I1'],
-      ['I3', 'I2'],
-      ['I3', 'I4'],
-      ['I3', 'I5'],
-      ['I3', 'I6'],
-      ['I3', 'I7'],
-      ['I3', 'I8']
+      ['i-1', 'i-0'],
+      ['i-1', 'i-2'],
+      ['i-1', 'i-3'],
+      ['i-1', 'i-4'],
+      ['i-1', 'i-5'],
+      ['i-1', 'i-6'],
+      ['i-1', 'i-7']
     ]
   };
 }

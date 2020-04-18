@@ -10,9 +10,9 @@ import { SensoryNeuron } from './sensoryneuron';
 
 export class Connectome implements IDisposable {
   constructor(options: Connectome.IOptions = {}) {
-    options.spec?.nodes.forEach(spec => {
-      const type = Array.isArray(spec) ? spec[0] : spec;
-      const key = Array.isArray(spec) ? spec[1] : undefined;
+    options.spec?.nodes.forEach(neuron => {
+      const type = Array.isArray(neuron) ? neuron[0] : neuron;
+      const key = Array.isArray(neuron) ? neuron[1] : undefined;
       switch (type) {
         case 'interneuron':
           this.graph.add(new Interneuron(), key);
@@ -32,8 +32,6 @@ export class Connectome implements IDisposable {
     });
   }
 
-  protected graph = new Graph<Neuron>();
-
   get isDisposed(): boolean {
     return this.graph.isDisposed;
   }
@@ -41,7 +39,7 @@ export class Connectome implements IDisposable {
   dehydrate(): Connectome.Specification {
     const dehydrated: Connectome.Specification = { edges: [], nodes: [] };
     for (let [key, node] of this.graph.entries()) {
-      dehydrated.nodes.push([node.value.type, key]);
+      dehydrated.nodes.push([node.content.type, key]);
       for (let [src] of node.in.entries()) {
         dehydrated.edges.push([src, key]);
       }
@@ -55,6 +53,8 @@ export class Connectome implements IDisposable {
   dispose() {
     this.graph.dispose();
   }
+
+  protected graph = new Graph<Neuron>();
 }
 
 export namespace Connectome {

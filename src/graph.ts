@@ -18,7 +18,7 @@ export class Graph<T extends IObservableDisposable>
     return this.graph.size;
   }
 
-  add(value: T, key = UUID.uuid4()) {
+  add(content: T, key = UUID.uuid4()) {
     const { graph } = this;
 
     if (graph.has(key)) {
@@ -26,8 +26,8 @@ export class Graph<T extends IObservableDisposable>
       return;
     }
 
-    graph.set(key, { value, in: new Map(), out: new Map() });
-    value.disposed.connect(() => {
+    graph.set(key, { content, in: new Map(), out: new Map() });
+    content.disposed.connect(() => {
       this.remove(key);
     }, this);
   }
@@ -37,7 +37,7 @@ export class Graph<T extends IObservableDisposable>
       return;
     }
     this.graph.forEach(node => {
-      node.value.dispose();
+      node.content.dispose();
     });
     this._isDisposed = true;
     this._disposed.emit(undefined);
@@ -103,7 +103,7 @@ export class Graph<T extends IObservableDisposable>
 
 export namespace Graph {
   export type Node<T> = {
-    value: T;
+    content: T;
     in: Map<string, ReadonlyJSONObject | undefined>;
     out: Map<string, ReadonlyJSONObject | undefined>;
   };
