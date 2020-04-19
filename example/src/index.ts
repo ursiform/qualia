@@ -10,47 +10,47 @@ function main() {
   const connectome = new Connectome({ spec: Specs.alpha });
   const spec = connectome.dehydrate();
   const header = document.querySelector('main header') as HTMLElement;
-  const figure = document.getElementById('figure');
+  const container = document.getElementById('figure');
   const arrow = 'triangle';
-  const nodes = spec.nodes.map((node, index) => ({
-    data: { id: Array.isArray(node) ? node[1] : `${node}-${index}` }
-  }));
-  const edges = spec.edges.map(([source, target]) => ({
-    data: { id: `${source}-${target}`, arrow, source, target }
-  }));
-
-  (window as any).connectome = connectome;
-  cytoscape({
-    container: figure,
-    elements: nodes.concat(edges),
-    style: [
-      {
-        selector: 'node',
-        style: {
-          'background-color': '#888888',
-          label: 'data(id)'
-        }
-      },
-      {
-        selector: 'edge',
-        style: {
-          width: 2,
-          'curve-style': 'straight',
-          'line-color': '#aaaaaa'
-        }
-      },
-      {
-        selector: 'edge[arrow]',
-        style: {
-          'target-arrow-shape': 'triangle',
-          'target-arrow-color': '#999999'
-        }
+  const elements = spec.nodes
+    .map((node, index) => ({
+      data: { id: Array.isArray(node) ? node[1] : `${node}-${index}` }
+    }))
+    .concat(
+      spec.edges.map(([source, target]) => ({
+        data: { id: `${source}-${target}`, arrow, source, target }
+      }))
+    );
+  const style: cytoscape.Stylesheet[] = [
+    {
+      selector: 'node',
+      style: {
+        'background-color': '#888888',
+        label: 'data(id)'
       }
-    ],
-    layout: { name: 'grid', rows: 4 }
-  });
+    },
+    {
+      selector: 'edge',
+      style: {
+        width: 2,
+        'curve-style': 'straight',
+        'line-color': '#aaaaaa'
+      }
+    },
+    {
+      selector: 'edge[arrow]',
+      style: {
+        'target-arrow-shape': 'triangle',
+        'target-arrow-color': '#999999'
+      }
+    }
+  ];
+  const layout: cytoscape.LayoutOptions = { name: 'grid', rows: 4 };
+
+  cytoscape({ container, elements, style, layout });
   header.textContent = `qualia v${Qualia.version}`;
-  console.log('connectome', connectome);
+  (window as any).connectome = connectome;
+  console.log('window.connectome', connectome);
 }
 
 window.addEventListener('load', main);
