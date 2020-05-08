@@ -1,0 +1,44 @@
+{
+  "name": "@qualia/graph",
+  "version": "0.1.0",
+  "description": "",
+  "author": "Afshin T. Darian <qualia@darian.af>",
+  "homepage": "https://github.com/ursiform/qualia#readme",
+  "license": "UNLICENSED",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "directories": {
+    "lib": "lib/"
+  },
+  "files": [
+    "lib/**/*.{d.ts,eot,gif,html,jpg,js,js.map,json,png,svg,woff2,ttf}"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ursiform/qualia.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ursiform/qualia/issues"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "clean": "rimraf lib && rimraf node_modules",
+    "test": "echo \"Error: run tests from root\" && exit 1",
+    "watch": "tsc --watch --listEmittedFiles"
+  },
+  "devDependencies": {
+    "prettier": "^2.0.4",
+    "rimraf": "^3.0.2",
+    "tslint": "^6.1.1",
+    "tslint-plugin-prettier": "^2.1.0",
+    "typescript": "^3.7.4"
+  },
+  "dependencies": {
+    "@lumino/coreutils": "^1.4.2",
+    "@lumino/disposable": "^1.3.5",
+    "@lumino/signaling": "^1.3.5"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

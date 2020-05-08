@@ -1,0 +1,44 @@
+{
+  "name": "qualia",
+  "version": "0.1.0",
+  "description": "",
+  "license": "UNLICENSED",
+  "author": "Afshin T. Darian <qualia@darian.af>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ursiform/qualia.git"
+  },
+  "directories": {
+    "lib": "lib/"
+  },
+  "files": [
+    "lib/**/*.{d.ts,eot,gif,html,jpg,js,js.map,json,png,svg,woff2,ttf}"
+  ],
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "scripts": {
+    "build": "tsc --build",
+    "clean": "rimraf lib && rimraf node_modules",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "watch": "tsc --watch --listEmittedFiles"
+  },
+  "devDependencies": {
+    "lerna": "^3.20.2",
+    "prettier": "^2.0.4",
+    "rimraf": "^3.0.2",
+    "tslint": "^6.1.1",
+    "tslint-plugin-prettier": "^2.1.0",
+    "typescript": "^3.7.4"
+  },
+  "dependencies": {
+    "@lumino/coreutils": "^1.4.2",
+    "@lumino/disposable": "^1.3.5",
+    "@lumino/signaling": "^1.3.5",
+    "@qualia/connectome": "file:../../packages/connectome",
+    "@qualia/graph": "file:../../packages/graph",
+    "@qualia/neuron": "file:../../packages/neuron"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

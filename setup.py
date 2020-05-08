@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="qualia",
-    version="0.0.1",
+    version="0.1.0",
     author="Afshin T. Darian",
     author_email="qualia@darian.af",
     description="qualia",
