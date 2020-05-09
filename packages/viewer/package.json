@@ -9,18 +9,21 @@
     "url": "git+https://github.com/ursiform/qualia.git"
   },
   "directories": {
+    "build": "build/",
     "lib": "lib/"
   },
   "files": [
-    "lib/**/*.{d.ts,eot,gif,html,jpg,js,js.map,json,png,svg,woff2,ttf}"
+    "build/**/*.{d.ts,eot,gif,html,jpg,js,js.map,json,png,svg,woff2,ttf}",
+    "lib/**/*.{d.ts,eot,gif,html,jpg,js,js.map,json,png,svg,woff2,ttf}",
+    "index.html",
+    "index.css"
   ],
-  "main": "lib/index.js",
-  "types": "lib/index.d.ts",
   "scripts": {
     "build": "webpack",
     "clean": "rimraf build && rimraf lib && rimraf node_modules",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "watch": "webpack --watch"
+    "watch": "webpack --watch",
+    "start": "http-server ."
   },
   "devDependencies": {
     "@types/cytoscape": "^3.14.0",
@@ -39,6 +42,7 @@
     "@qualia/graph": "^0.1.0",
     "@qualia/neuron": "^0.1.0",
     "cytoscape": "^3.14.1",
+    "http-server": "^0.12.3",
     "qualia": "^0.1.0"
   },
   "publishConfig": {
