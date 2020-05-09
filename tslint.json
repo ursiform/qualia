@@ -1,7 +1,12 @@
 {
   "rulesDirectory": ["tslint-plugin-prettier"],
   "rules": {
-    "prettier": [true, { "singleQuote": true }],
+    "prettier": [true, {
+      "arrowParens": "avoid",
+      "singleQuote": true,
+      "trailingComma": "none"
+      }
+  ],
     "align": [true, "parameters", "statements"],
     "await-promise": true,
     "ban": [
@@ -62,7 +67,7 @@
     ],
     "one-variable-per-declaration": [true, "ignore-for-loop"],
     "quotemark": {
-      "options": [true, "single", "avoid-escape"],
+      "options": ["single", "avoid-escape"],
       "severity": "off"
     },
     "radix": true,

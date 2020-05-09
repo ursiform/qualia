@@ -1,6 +1,7 @@
 .DS_Store
 build
 dist
+lerna-debug.log
 lib
 node_modules
 qualia.egg-info
