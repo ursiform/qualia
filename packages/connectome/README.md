@@ -1,4 +1,4 @@
-# `@qualia/graph`
+# `@qualia/connectome`
 
 This software is not licensed for use.
 
