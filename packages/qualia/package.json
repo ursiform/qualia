@@ -1,6 +1,6 @@
 {
   "name": "qualia",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "",
   "license": "UNLICENSED",
   "author": "Afshin T. Darian <qualia@darian.af>",
@@ -31,7 +31,7 @@
     "typescript": "^3.7.4"
   },
   "dependencies": {
-    "@qualia/connectome": "^0.1.2",
+    "@qualia/connectome": "^0.1.3",
     "@qualia/graph": "^0.1.2",
     "@qualia/neuron": "^0.1.2"
   },
