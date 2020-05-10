@@ -31,12 +31,9 @@
     "typescript": "^3.7.4"
   },
   "dependencies": {
-    "@lumino/coreutils": "^1.4.2",
-    "@lumino/disposable": "^1.3.5",
-    "@lumino/signaling": "^1.3.5",
-    "@qualia/connectome": "file:../../packages/connectome",
-    "@qualia/graph": "file:../../packages/graph",
-    "@qualia/neuron": "file:../../packages/neuron"
+    "@qualia/connectome": "^0.1.2",
+    "@qualia/graph": "^0.1.2",
+    "@qualia/neuron": "^0.1.2"
   },
   "publishConfig": {
     "access": "public"
