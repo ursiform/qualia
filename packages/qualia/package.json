@@ -24,10 +24,8 @@
   },
   "devDependencies": {
     "lerna": "^3.20.2",
-    "prettier": "^2.0.4",
     "rimraf": "^3.0.2",
     "tslint": "^6.1.1",
-    "tslint-plugin-prettier": "^2.1.0",
     "typescript": "^3.7.4"
   },
   "dependencies": {
