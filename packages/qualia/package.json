@@ -17,7 +17,7 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "scripts": {
-    "build": "tsc --build",
+    "build": "tsc --build src",
     "clean": "rimraf lib && rimraf node_modules",
     "test": "echo \"Error: no test specified\" && exit 1",
     "watch": "tsc --watch --listEmittedFiles"
