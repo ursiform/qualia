@@ -4,7 +4,7 @@ import { Neuron } from './neuron';
 
 export class MotorNeuron extends Neuron {
   readonly type: Neuron.Type = 'motor';
-  async fire(input: Neuron.Matrix): Promise<Neuron.Matrix> {
-    return input;
+  input(data: Neuron.Matrix): void {
+    // no-op
   }
 }

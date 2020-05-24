@@ -4,6 +4,10 @@ import { IObservableDisposable } from '@lumino/disposable';
 import { ISignal, Signal } from '@lumino/signaling';
 
 export abstract class Neuron implements IObservableDisposable {
+  readonly id: string;
+
+  readonly fired: ISignal<this, Neuron.Matrix>;
+
   abstract readonly type: Neuron.Type;
 
   get disposed(): ISignal<this, void> {
@@ -23,9 +27,14 @@ export abstract class Neuron implements IObservableDisposable {
     Signal.clearData(this);
   }
 
-  abstract async fire(input: Neuron.Matrix): Promise<Neuron.Matrix>;
+  abstract input(data: Neuron.Matrix): void;
+
+  protected fire(id: string, data: Neuron.Matrix): void {
+    this._fired.emit({ id, data });
+  }
 
   private _disposed = new Signal<this, void>(this);
+  private _fired = new Signal<this, { id: string; data: Neuron.Matrix }>(this);
   private _isDisposed = false;
 }
 
