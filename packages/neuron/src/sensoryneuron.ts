@@ -4,7 +4,7 @@ import { Neuron } from './neuron';
 
 export class SensoryNeuron extends Neuron {
   readonly type: Neuron.Type = 'sensory';
-  async tick(input: Neuron.Matrix): Promise<Neuron.Matrix> {
+  async fire(input: Neuron.Matrix): Promise<Neuron.Matrix> {
     return input;
   }
 }

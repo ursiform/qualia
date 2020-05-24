@@ -23,7 +23,7 @@ export abstract class Neuron implements IObservableDisposable {
     Signal.clearData(this);
   }
 
-  abstract async tick(input: Neuron.Matrix): Promise<Neuron.Matrix>;
+  abstract async fire(input: Neuron.Matrix): Promise<Neuron.Matrix>;
 
   private _disposed = new Signal<this, void>(this);
   private _isDisposed = false;
