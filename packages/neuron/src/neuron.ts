@@ -6,12 +6,14 @@ import { ISignal, Signal } from '@lumino/signaling';
 export abstract class Neuron implements IObservableDisposable {
   readonly id: string;
 
-  readonly fired: ISignal<this, Neuron.Matrix>;
-
   abstract readonly type: Neuron.Type;
 
   get disposed(): ISignal<this, void> {
     return this._disposed;
+  }
+
+  get fired(): ISignal<this, { id: string; data: Neuron.Matrix }> {
+    return this._fired;
   }
 
   get isDisposed(): boolean {
