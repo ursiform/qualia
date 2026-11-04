@@ -1,0 +1,156 @@
+"""Bounded JSON transport for CPython and browser-hosted Python."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import sys
+from typing import Any, Mapping
+import urllib.error
+import urllib.request
+
+from .validation import ProtocolError, number
+
+
+class TransportError(RuntimeError):
+    """An HTTP, reachability, or timeout failure; never a valid decision."""
+
+    def __init__(
+        self, message: str, *, status: int | None = None, timed_out: bool = False
+    ) -> None:
+        super().__init__(message)
+        self.status = status
+        self.timed_out = timed_out
+
+
+def is_pyodide() -> bool:
+    """Return whether Python is running in the browser environment."""
+    return sys.platform == "emscripten" or "pyodide" in sys.modules
+
+
+def _invalid_number(value: str) -> None:
+    raise ValueError(f"Non-finite JSON number: {value}")
+
+
+def _decode(raw: str) -> dict[str, Any]:
+    try:
+        parsed = json.loads(raw, parse_constant=_invalid_number)
+    except ValueError as exc:
+        raise ProtocolError("Expected a JSON object response") from exc
+    if not isinstance(parsed, dict):
+        raise ProtocolError("Expected a JSON object response")
+    return parsed
+
+
+def timeout_value(value: float) -> float:
+    number(value, "timeout", 0.0)
+    if value == 0:
+        raise ValueError("timeout must be positive")
+    return float(value)
+
+
+def request_json_sync(
+    url: str,
+    *,
+    method: str = "GET",
+    payload: Mapping[str, Any] | None = None,
+    headers: Mapping[str, str] | None = None,
+    timeout: float = 2.0,
+) -> dict[str, Any]:
+    """Make one HTTP request without retrying a potentially accepted step."""
+    timeout = timeout_value(timeout)
+    req_headers = {"Accept": "application/json", **(headers or {})}
+    body = None
+    if payload is not None:
+        body = json.dumps(payload, allow_nan=False).encode("utf-8")
+        req_headers.setdefault("Content-Type", "application/json")
+    request = urllib.request.Request(
+        url, data=body, headers=req_headers, method=method.upper()
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            status = getattr(response, "status", 200)
+            if not 200 <= status < 300:
+                raise TransportError(f"HTTP {status} from {url}", status=status)
+            raw = response.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        raise TransportError(f"HTTP {exc.code} from {url}", status=exc.code) from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        timed_out = isinstance(exc, TimeoutError) or isinstance(
+            getattr(exc, "reason", None), TimeoutError
+        )
+        raise TransportError(
+            f"QTP transport error for {url}: {exc}", timed_out=timed_out
+        ) from exc
+    except UnicodeError as exc:
+        raise ProtocolError("Response is not UTF-8 JSON") from exc
+    return _decode(raw)
+
+
+async def request_json_async(
+    url: str,
+    *,
+    method: str = "GET",
+    payload: Mapping[str, Any] | None = None,
+    headers: Mapping[str, str] | None = None,
+    timeout: float = 2.0,
+) -> dict[str, Any]:
+    """Use bounded browser fetch or offload the standard-library request."""
+    timeout = timeout_value(timeout)
+    if is_pyodide():
+        return await _pyfetch_json(
+            url, method=method, payload=payload, headers=headers, timeout=timeout
+        )
+    return await asyncio.to_thread(
+        request_json_sync,
+        url,
+        method=method,
+        payload=payload,
+        headers=headers,
+        timeout=timeout,
+    )
+
+
+async def _pyfetch_json(
+    url: str,
+    *,
+    method: str,
+    payload: Mapping[str, Any] | None,
+    headers: Mapping[str, str] | None,
+    timeout: float,
+) -> dict[str, Any]:
+    from js import AbortController  # type: ignore[import-not-found]
+    from pyodide.http import pyfetch  # type: ignore[import-not-found]
+
+    controller = AbortController.new()
+    req_headers = {"Accept": "application/json", **(headers or {})}
+    kwargs: dict[str, Any] = {
+        "method": method.upper(),
+        "headers": req_headers,
+        "signal": controller.signal,
+    }
+    if payload is not None:
+        kwargs["body"] = json.dumps(payload, allow_nan=False)
+        req_headers.setdefault("Content-Type", "application/json")
+
+    async def exchange() -> dict[str, Any]:
+        response = await pyfetch(url, **kwargs)
+        status = int(response.status)
+        if not 200 <= status < 300:
+            raise TransportError(f"HTTP {status} from {url}", status=status)
+        return _decode(await response.text())
+
+    try:
+        return await asyncio.wait_for(exchange(), timeout)
+    except asyncio.TimeoutError as exc:
+        controller.abort()
+        raise TransportError(
+            f"QTP request timed out after {timeout}s", timed_out=True
+        ) from exc
+    except asyncio.CancelledError:
+        controller.abort()
+        raise
+    except (TransportError, ProtocolError):
+        raise
+    except Exception as exc:
+        raise TransportError(f"QTP pyfetch error for {url}: {exc}") from exc

@@ -1,0 +1,715 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Qualia Transmission Protocol",
+    "version": "1.0",
+    "description": "QTP connects embodied peripherals to decision services. OpenAPI describes the HTTP and message contract; sequential step and preceding-action rules are also normative. The bundled loopback reference service runs a deterministic demonstration policy with synthetic pool readouts. Other services may use different decision policies.",
+    "license": {
+      "name": "BSD-3-Clause",
+      "identifier": "BSD-3-Clause"
+    }
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "paths": {
+    "/api/status": {
+      "get": {
+        "operationId": "status",
+        "summary": "Read QTP readiness and bounded service telemetry.",
+        "responses": {
+          "200": {
+            "description": "QTP readiness; additional service telemetry is permitted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                },
+                "example": {
+                  "protocol": "qtp/1.0",
+                  "ready": true,
+                  "engine": "reference",
+                  "policy": "reflex",
+                  "steps": 0,
+                  "last_action": null
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Browser origin or requested preflight headers are not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The resource does not support this HTTP method.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Allow": {
+                "description": "Supported methods for the resource.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "HTTP request failure; no decision is produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "options": {
+        "operationId": "statusPreflight",
+        "summary": "Check explicitly configured browser access.",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Access-Control-Request-Method",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Access-Control-Request-Headers",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The requested method and headers are allowed.",
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Methods": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Headers": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Private-Network": {
+                "schema": {
+                  "type": "string",
+                  "const": "true"
+                }
+              },
+              "Vary": {
+                "schema": {
+                  "type": "string",
+                  "const": "Origin"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed JSON, invalid message fields, or invalid initial outcome.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Browser origin or requested preflight headers are not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The resource does not support this HTTP method.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Allow": {
+                "description": "Supported methods for the resource.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "HTTP request failure; no decision is produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/qtp/step": {
+      "post": {
+        "operationId": "step",
+        "summary": "Integrate one observation and optional preceding physical outcome.",
+        "description": "The first request has step 0 and null or absent action and consequence. Each successful request advances the expected step by one. Later action values must match the preceding returned intention; consequence may be null when unavailable. The response echoes the request step and has fallback=false. Invalid requests and sequence conflicts must not advance the session. The percept step is a source frame index and need not equal the decision step. The reference service supports one client per process; restart it to begin a fresh episode. Failed operations are not automatically retried.",
+        "x-reference-limit": 2097152,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StepRequest"
+              },
+              "example": {
+                "protocol": "qtp/1.0",
+                "step": 0,
+                "percept": {
+                  "width": 1,
+                  "height": 1,
+                  "rgb": "DAwY",
+                  "step": 0,
+                  "phase": "visible",
+                  "cue": null
+                },
+                "action": null,
+                "consequence": null
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One decision from the remote service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed JSON, invalid message fields, or invalid initial outcome.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Browser origin or requested preflight headers are not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The resource does not support this HTTP method.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Allow": {
+                "description": "Supported methods for the resource.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Step or preceding action conflicts with the current session; no state changes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "411": {
+            "description": "A Content-Length header is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The reference server request body limit was exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "A step requires application/json with a UTF-8 body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "HTTP request failure; no decision is produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "options": {
+        "operationId": "stepPreflight",
+        "summary": "Check explicitly configured browser access.",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Access-Control-Request-Method",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Access-Control-Request-Headers",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The requested method and headers are allowed.",
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Methods": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Headers": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Private-Network": {
+                "schema": {
+                  "type": "string",
+                  "const": "true"
+                }
+              },
+              "Vary": {
+                "schema": {
+                  "type": "string",
+                  "const": "Origin"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed JSON, invalid message fields, or invalid initial outcome.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Browser origin or requested preflight headers are not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The resource does not support this HTTP method.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Allow": {
+                "description": "Supported methods for the resource.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "HTTP request failure; no decision is produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "operationId": "specification",
+        "summary": "Download this OpenAPI description with all schemas bundled.",
+        "responses": {
+          "200": {
+            "description": "A self-contained OpenAPI 3.1 document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["openapi", "info", "paths", "components"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Browser origin or requested preflight headers are not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The resource does not support this HTTP method.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Allow": {
+                "description": "Supported methods for the resource.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "HTTP request failure; no decision is produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "options": {
+        "operationId": "specificationPreflight",
+        "summary": "Check explicitly configured browser access.",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Access-Control-Request-Method",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Access-Control-Request-Headers",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The requested method and headers are allowed.",
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Methods": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Headers": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Private-Network": {
+                "schema": {
+                  "type": "string",
+                  "const": "true"
+                }
+              },
+              "Vary": {
+                "schema": {
+                  "type": "string",
+                  "const": "Origin"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed JSON, invalid message fields, or invalid initial outcome.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Browser origin or requested preflight headers are not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The resource does not support this HTTP method.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Allow": {
+                "description": "Supported methods for the resource.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "HTTP request failure; no decision is produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Status": {
+        "type": "object",
+        "required": ["protocol", "ready"],
+        "properties": {
+          "protocol": {
+            "type": "string",
+            "const": "qtp/1.0"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "engine": {
+            "type": "string"
+          },
+          "policy": {
+            "type": "string"
+          },
+          "steps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "last_action": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Action"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["error", "detail"],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "step": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "RemoteIntention": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Intention"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "fallback": {
+                "const": false
+              }
+            }
+          }
+        ]
+      },
+      "RemoteResponse": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/RemoteIntention"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["intention"],
+            "properties": {
+              "intention": {
+                "$ref": "#/components/schemas/RemoteIntention"
+              }
+            }
+          }
+        ]
+      },
+      "Action": {
+        "$ref": "qtp.v1.schema.json#/$defs/Action"
+      },
+      "Phase": {
+        "$ref": "qtp.v1.schema.json#/$defs/Phase"
+      },
+      "Percept": {
+        "$ref": "qtp.v1.schema.json#/$defs/Percept"
+      },
+      "Consequence": {
+        "$ref": "qtp.v1.schema.json#/$defs/Consequence"
+      },
+      "Intention": {
+        "$ref": "qtp.v1.schema.json#/$defs/Intention"
+      },
+      "StepRequest": {
+        "$ref": "qtp.v1.schema.json#/$defs/StepRequest"
+      },
+      "StepResponse": {
+        "$ref": "qtp.v1.schema.json#/$defs/StepResponse"
+      }
+    }
+  }
+}
