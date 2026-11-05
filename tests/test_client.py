@@ -120,7 +120,7 @@ class TestClient(unittest.TestCase):
                 fp=io.BytesIO(b"{}"),  # type: ignore[arg-type]
             )
 
-        with patch("urllib.request.urlopen", side_effect=_fake_urlopen):
+        with patch("urllib.request.OpenerDirector.open", side_effect=_fake_urlopen):
             url = "http://127.0.0.1:8001"
             client = connect(url, mode="remote", timeout=2.0)
             status = client.status_sync()

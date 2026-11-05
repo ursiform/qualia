@@ -19,12 +19,16 @@ The package includes a loopback reference server running the deterministic
 clients to another decision runtime. QTP readiness advertises
 `protocol: "qtp/1.0"` and a boolean `ready` value.
 
-`mode="auto"` explicitly permits local fallback after a network failure. HTTP
-errors (including 403 and 404), malformed responses, and timeouts always raise.
+`mode="auto"` checks `GET /api/status` before each step and permits local
+fallback only if that check cannot reach the service. Once a step is sent,
+every failure raises: even a connection loss before response headers can leave
+the remote decision committed. HTTP errors (including 403 and 404), malformed
+responses, and timeouts always raise.
 Use `remote` for research sessions so a service failure cannot replace the
 decision policy. Local pool counts and scores are synthetic demonstration
 readouts, not measurements of a remote system. Neither client retries a failed
-step automatically; a timeout can leave the server's step outcome unknown.
+step automatically. Reconcile server state after an ambiguous failure before
+continuing; a client reset does not undo a remote step.
 
 ---
 

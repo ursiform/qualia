@@ -20,6 +20,7 @@ const response = (value) =>
   new Response(JSON.stringify(value), {
     headers: { "Content-Type": "application/json" },
   });
+const ready = { protocol: "qtp/1.0", ready: true };
 
 async function withFetch(fetcher, run) {
   const original = globalThis.fetch;
@@ -30,6 +31,67 @@ async function withFetch(fetcher, run) {
     globalThis.fetch = original;
   }
 }
+
+test("large finite numbers survive JSON wire serialization", () => {
+  for (const value of [
+    2 ** 52,
+    -(2 ** 52),
+    1e303,
+    1e308,
+    -1e308,
+    Number.MAX_VALUE,
+  ]) {
+    const consequence = new Consequence({
+      reward: value,
+      progress: value,
+      range: Math.abs(value),
+    });
+    const wire = JSON.parse(JSON.stringify(consequence.toDict()));
+    assert.equal(wire.reward, value);
+    assert.equal(wire.progress, value);
+    assert.equal(wire.range, Math.abs(value));
+    const intention = new Intention({
+      scores: { left: value, right: 0.3, forward: 0.2 },
+    });
+    assert.equal(
+      JSON.parse(JSON.stringify(intention.toDict())).scores.left,
+      value,
+    );
+  }
+});
+
+test("a failed POST never falls back even without response headers", async () => {
+  for (const body of [false, true]) {
+    const methods = [];
+    await withFetch(
+      async (url, options) => {
+        methods.push(options.method ?? "GET");
+        if (options.method !== "POST") return response(ready);
+        if (!body) throw new TypeError("connection lost after remote commit");
+        return {
+          ok: true,
+          status: 200,
+          text: async () => {
+            throw new TypeError("body reset");
+          },
+        };
+      },
+      async () => {
+        const client = connect(undefined, "auto");
+        await assert.rejects(
+          client.step(new Percept()),
+          (error) =>
+            error instanceof TransportError &&
+            error.status === (body ? 200 : null),
+        );
+        assert.deepEqual(methods, ["GET", "POST"]);
+        assert.equal(client.stepCount, 0);
+        assert.equal(client.local.stepCount, 0);
+        assert.equal(client.lastAction, null);
+      },
+    );
+  }
+});
 
 test("identical uniform and textured images have zero flow", () => {
   for (const rgb of [
@@ -126,7 +188,8 @@ test("malformed responses never advance either engine", async () => {
     invalid.push({ ...decision(), ...change });
   for (const value of invalid) {
     await withFetch(
-      async () => response(value),
+      async (url, options) =>
+        response(options.method === "POST" ? value : ready),
       async () => {
         const client = connect(undefined, "auto");
         await assert.rejects(client.step(new Percept()), ProtocolError);
@@ -138,7 +201,8 @@ test("malformed responses never advance either engine", async () => {
   }
   for (const body of ["", "not-json", '{"value":NaN}']) {
     await withFetch(
-      async () => new Response(body),
+      async (url, options) =>
+        options.method === "POST" ? new Response(body) : response(ready),
       async () => {
         await assert.rejects(
           connect(undefined, "auto").step(new Percept()),
@@ -174,9 +238,9 @@ test("fallback interprets blocking against the real remote action", async () => 
   ]) {
     let online = true;
     await withFetch(
-      async () => {
+      async (url, options) => {
         if (!online) throw new TypeError("offline");
-        return response(decision(action));
+        return response(options.method === "POST" ? decision(action) : ready);
       },
       async () => {
         const client = connect(undefined, "auto");
@@ -204,14 +268,18 @@ test("timeout covers headers and response body and aborts the request", async ()
       async (url, options) => {
         calls += 1;
         signal = options.signal;
-        if (stallBody) return { ok: true, text: () => new Promise(() => {}) };
+        if (stallBody)
+          return { ok: true, status: 200, text: () => new Promise(() => {}) };
         return new Promise(() => {});
       },
       async () => {
         const client = connect(undefined, "auto", { timeout: 0.01 });
         await assert.rejects(
           client.step(new Percept()),
-          (error) => error instanceof TransportError && error.timedOut,
+          (error) =>
+            error instanceof TransportError &&
+            error.timedOut &&
+            error.status === (stallBody ? 200 : null),
         );
         assert.equal(signal.aborted, true);
         assert.equal(calls, 1);

@@ -361,4 +361,7 @@ def _clamp(value: float, low: float, high: float) -> float:
 
 
 def _round6(value: float) -> float:
+    # Binary64 has no fractional precision at these magnitudes.
+    if abs(value) >= 2**52:
+        return value
     return round(value * 1_000_000) / 1_000_000

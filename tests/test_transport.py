@@ -1,0 +1,233 @@
+"""Real HTTP failures must not silently replace committed decisions."""
+
+import asyncio
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
+import os
+from pathlib import Path
+import shutil
+import socket
+import subprocess
+from threading import Event, Thread
+from time import monotonic, sleep
+import unittest
+from unittest.mock import patch
+
+from qualia import Percept, ProtocolError, TransportError, connect
+from qualia.transport import request_json_sync
+
+
+class FailureHandler(BaseHTTPRequestHandler):
+    def handle(self):
+        try:
+            super().handle()
+        finally:
+            self.server.finished.set()
+
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        self.server.gets += 1
+        if self.server.mode == "offline":
+            self.connection.shutdown(socket.SHUT_RDWR)
+            return
+        body = json.dumps(
+            {
+                "protocol": "qtp/1.0",
+                "ready": self.server.mode != "unready",
+            }
+        ).encode()
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self):
+        self.rfile.read(int(self.headers["Content-Length"]))
+        self.server.posts += 1  # The remote step is now committed.
+        mode = self.server.mode
+        if mode == "headers":
+            self.connection.shutdown(socket.SHUT_RDWR)
+            return
+        try:
+            if mode == "slow-headers":
+                self.wfile.write(b"HTTP/1.1 200 OK\r\nX-Trickle: ")
+                self.trickle(b"x" * 300)
+                return
+            body = {
+                "body": b"{",
+                "json": b"not JSON",
+                "nested": b'{"x":' * 2000 + b"0" + b"}" * 2000,
+                "slow-body": b" " * 300 + b"{}",
+                "http": b"{}",
+            }[mode]
+            self.send_response(503 if mode == "http" else 200)
+            self.send_header(
+                "Content-Length", str(100 if mode == "body" else len(body))
+            )
+            self.end_headers()
+            if mode == "slow-body":
+                self.trickle(body)
+            else:
+                self.wfile.write(body)
+                self.wfile.flush()
+                if mode == "body":
+                    self.connection.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            self.server.disconnected.set()
+
+    def trickle(self, body):
+        for byte in body:
+            self.wfile.write(bytes([byte]))
+            self.wfile.flush()
+            sleep(0.01)
+
+
+@contextmanager
+def failure_server(mode):
+    with ThreadingHTTPServer(("127.0.0.1", 0), FailureHandler) as server:
+        server.mode = mode
+        server.gets = server.posts = 0
+        server.disconnected = Event()
+        server.finished = Event()
+        thread = Thread(
+            target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+        )
+        thread.start()
+        try:
+            yield server, f"http://127.0.0.1:{server.server_port}"
+        finally:
+            server.shutdown()
+            thread.join(timeout=2)
+
+
+def python_failure(url, asynchronous):
+    client = connect(url, mode="auto", timeout=0.15)
+    try:
+        intention = (
+            asyncio.run(client.step(Percept()))
+            if asynchronous
+            else client.step_sync(Percept())
+        )
+        result = {"action": intention.action, "fallback": intention.fallback}
+    except (TransportError, ProtocolError) as error:
+        result = {
+            "error": type(error).__name__,
+            "status": getattr(error, "status", None),
+            "timedOut": getattr(error, "timed_out", False),
+        }
+    return {
+        **result,
+        "steps": client.step_count,
+        "localSteps": client.local.step_count,
+        "lastAction": client.last_action,
+    }
+
+
+class TestHTTPFailures(unittest.TestCase):
+    def test_expired_dns_lookup_cannot_send_a_late_request(self):
+        release = Event()
+        started = Event()
+        resolve = socket.getaddrinfo
+
+        def delayed_resolve(*args, **kwargs):
+            started.set()
+            release.wait(2)
+            return resolve(*args, **kwargs)
+
+        with failure_server("offline") as (server, url):
+            with patch("socket.getaddrinfo", side_effect=delayed_resolve):
+                try:
+                    start = monotonic()
+                    with self.assertRaises(TransportError) as raised:
+                        request_json_sync(url, method="POST", payload={}, timeout=0.15)
+                    self.assertLess(monotonic() - start, 0.8)
+                    self.assertTrue(started.is_set())
+                    self.assertTrue(raised.exception.timed_out)
+                finally:
+                    release.set()
+                self.assertTrue(server.finished.wait(0.8))
+            self.assertEqual((server.gets, server.posts), (0, 0))
+
+    def test_native_deadline_closes_trickling_headers_and_body(self):
+        for mode in ("slow-headers", "slow-body"):
+            for asynchronous in (False, True):
+                with self.subTest(mode=mode, asynchronous=asynchronous):
+                    with failure_server(mode) as (server, url):
+                        start = monotonic()
+                        result = python_failure(url, asynchronous)
+                        self.assertLess(monotonic() - start, 0.8)
+                        self.assertEqual(result["error"], "TransportError")
+                        self.assertTrue(result["timedOut"])
+                        self.assertEqual(result["steps"], 0)
+                        self.assertEqual(server.posts, 1)
+                        self.assertTrue(server.disconnected.wait(0.8))
+
+    def test_python_and_javascript_failure_classification_and_state_match(self):
+        root = Path(__file__).resolve().parents[1]
+        node = os.environ.get("QUALIA_NODE") or shutil.which("node")
+        if not node:
+            if os.environ.get("CI"):
+                self.fail("Node is required for HTTP failure parity")
+            self.skipTest("Node is required for HTTP failure parity")
+        for mode in (
+            "offline",
+            "unready",
+            "headers",
+            "body",
+            "http",
+            "json",
+            "nested",
+            "slow-headers",
+            "slow-body",
+        ):
+            rows = []
+            for language in ("sync", "async", "javascript"):
+                with self.subTest(mode=mode, language=language):
+                    with failure_server(mode) as (server, url):
+                        if language == "javascript":
+                            process = subprocess.run(
+                                [node, str(root / "tests/js/failures.mjs"), url],
+                                text=True,
+                                capture_output=True,
+                                check=True,
+                                timeout=8,
+                            )
+                            result = json.loads(process.stdout)
+                        else:
+                            result = python_failure(url, language == "async")
+                        rows.append(
+                            {**result, "gets": server.gets, "posts": server.posts}
+                        )
+            with self.subTest(mode=mode):
+                self.assertEqual(rows[0], rows[1])
+                self.assertEqual(rows[0], rows[2])
+                row = rows[0]
+                self.assertEqual(row["gets"], 1)
+                self.assertEqual(
+                    row["posts"], 0 if mode in ("offline", "unready") else 1
+                )
+                if mode == "offline":
+                    self.assertTrue(row["fallback"])
+                    self.assertEqual(row["steps"], 1)
+                else:
+                    self.assertEqual(row["steps"], 0)
+                    self.assertEqual(row["localSteps"], 0)
+                    self.assertIsNone(row["lastAction"])
+                    self.assertEqual(
+                        row["error"],
+                        "ProtocolError"
+                        if mode in ("unready", "json", "nested")
+                        else "TransportError",
+                    )
+                    self.assertEqual(row["timedOut"], mode.startswith("slow-"))
+                    self.assertEqual(
+                        row["status"],
+                        200
+                        if mode in ("body", "slow-body")
+                        else 503
+                        if mode == "http"
+                        else None,
+                    )

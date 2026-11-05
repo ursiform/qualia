@@ -47,7 +47,7 @@
   },
   "scripts": {
     "test": "node --test tests/js/test_qtp.mjs tests/js/test_regressions.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "npx --yes --package typescript@5.6.3 tsc --noEmit",
     "build:lite": "jupyter lite build --config lite/jupyter_lite_config.json",
     "serve:lite": "jupyter lite serve --config lite/jupyter_lite_config.json",
     "generate:schema": "python3 tools/schema.py"

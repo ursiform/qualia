@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from copy import deepcopy
+import json
+import math
 import sys
 import types
 import unittest
@@ -25,6 +27,9 @@ from qualia.transport import request_json_async, request_json_sync
 
 def decision(action="left", step=0):
     return Intention(action=action, step=step).to_dict()
+
+
+READY = {"protocol": "qtp/1.0", "ready": True}
 
 
 class TestFlowAndRetina(unittest.TestCase):
@@ -65,6 +70,18 @@ class TestFlowAndRetina(unittest.TestCase):
 
 
 class TestClientContract(unittest.TestCase):
+    def test_large_finite_values_survive_wire_serialization(self):
+        for value in (2**52, -(2**52), 1e303, 1e308, -1e308, sys.float_info.max):
+            consequence = Consequence(reward=value, progress=value, range=abs(value))
+            wire = json.loads(json.dumps(consequence.to_dict(), allow_nan=False))
+            self.assertEqual(wire["reward"], value)
+            self.assertEqual(wire["progress"], value)
+            self.assertEqual(wire["range"], abs(value))
+            intent = Intention(scores={"left": value, "right": 0.3, "forward": 0.2})
+            wire = json.loads(json.dumps(intent.to_dict(), allow_nan=False))
+            self.assertEqual(wire["scores"]["left"], value)
+            self.assertTrue(math.isfinite(wire["scores"]["left"]))
+
     def test_default_requires_remote_service(self):
         client = connect()
         self.assertEqual(client.mode, "remote")
@@ -135,7 +152,12 @@ class TestClientContract(unittest.TestCase):
                         if asynchronous
                         else "qualia.client.request_json_sync"
                     )
-                    with patch(target, return_value=deepcopy(response)):
+                    with patch(
+                        target,
+                        side_effect=lambda *args, **kwargs: READY
+                        if kwargs.get("method") == "GET"
+                        else deepcopy(response),
+                    ):
                         with self.assertRaises(ProtocolError):
                             asyncio.run(
                                 client.step(Percept())
@@ -161,7 +183,7 @@ class TestClientContract(unittest.TestCase):
             client = connect(mode="auto")
             frame = client.retina.observe(0.4)
             with patch(
-                "qualia.client.request_json_sync", return_value=decision(action)
+                "qualia.client.request_json_sync", side_effect=[READY, decision(action)]
             ):
                 client.step_sync(frame)
             self.assertEqual(client.local.status()["last_action"], action)
@@ -204,6 +226,65 @@ class TestClientContract(unittest.TestCase):
 
 
 class TestTransport(unittest.TestCase):
+    def test_pyodide_failed_post_never_falls_back_or_advances(self):
+        for failure in ("headers", "body", "parser"):
+            with self.subTest(failure=failure):
+                calls = []
+                loads = json.loads
+
+                class Response:
+                    status = 200
+
+                    def __init__(self, method):
+                        self.method = method
+
+                    async def text(self):
+                        if self.method == "GET":
+                            return json.dumps(READY)
+                        if failure == "body":
+                            raise OSError("response body reset")
+                        return "{}"
+
+                async def fetch(url, **options):
+                    calls.append(options["method"])
+                    if options["method"] == "POST" and failure == "headers":
+                        raise OSError("connection lost after remote commit")
+                    return Response(options["method"])
+
+                def decode(raw, **options):
+                    if raw == "{}" and failure == "parser":
+                        raise RecursionError("JSON nesting too deep")
+                    return loads(raw, **options)
+
+                modules = {
+                    "js": types.SimpleNamespace(
+                        AbortController=types.SimpleNamespace(
+                            new=lambda: types.SimpleNamespace(
+                                signal=None, abort=lambda: None
+                            )
+                        )
+                    ),
+                    "pyodide": types.ModuleType("pyodide"),
+                    "pyodide.http": types.SimpleNamespace(pyfetch=fetch),
+                }
+                client = connect(mode="auto")
+                with (
+                    patch.dict(sys.modules, modules),
+                    patch("qualia.transport.json.loads", side_effect=decode),
+                ):
+                    with self.assertRaises(
+                        ProtocolError if failure == "parser" else TransportError
+                    ) as raised:
+                        asyncio.run(client.step(Percept()))
+                self.assertEqual(calls, ["GET", "POST"])
+                self.assertEqual(client.step_count, 0)
+                self.assertEqual(client.local.step_count, 0)
+                self.assertIsNone(client.last_action)
+                if failure != "parser":
+                    self.assertEqual(
+                        raised.exception.status, 200 if failure == "body" else None
+                    )
+
     def test_invalid_json_and_wrong_shapes_are_protocol_failures(self):
         for raw in (b"", b"not-json", b"[]", b"null", b'{"value":NaN}'):
 
@@ -219,13 +300,13 @@ class TestTransport(unittest.TestCase):
                 def __exit__(self, *args):
                     pass
 
-            with patch("urllib.request.urlopen", return_value=Response()):
+            with patch("urllib.request.OpenerDirector.open", return_value=Response()):
                 with self.assertRaises(ProtocolError):
                     request_json_sync("http://example.invalid")
 
     def test_socket_timeout_is_distinguished_from_connection_refusal(self):
         for error in (TimeoutError(), urllib.error.URLError(TimeoutError())):
-            with patch("urllib.request.urlopen", side_effect=error):
+            with patch("urllib.request.OpenerDirector.open", side_effect=error):
                 with self.assertRaises(TransportError) as raised:
                     request_json_sync("http://example.invalid")
                 self.assertTrue(raised.exception.timed_out)
@@ -268,6 +349,7 @@ class TestTransport(unittest.TestCase):
                         request_json_async("http://example.invalid", timeout=0.01)
                     )
             self.assertTrue(raised.exception.timed_out)
+            self.assertEqual(raised.exception.status, 200 if stall_body else None)
             self.assertTrue(controllers[0].signal.aborted)
 
     def test_cancelled_browser_request_is_aborted(self):

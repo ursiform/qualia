@@ -71,7 +71,21 @@ class TestParity(unittest.TestCase):
             "retinas": [],
             "wires": [],
         }
-        for value in (0.0000005, 0.0000015, -0.0000005, -0.0000015, -0.2, 0.7):
+        for value in (
+            0.0000005,
+            0.0000015,
+            -0.0000005,
+            -0.0000015,
+            -0.2,
+            0.7,
+            2**52 - 0.5,
+            2**52,
+            -(2**52),
+            1e303,
+            1e308,
+            -1e308,
+            float.fromhex("0x1.fffffffffffffp+1023"),
+        ):
             cases["wires"].append(
                 {
                     "kind": "consequence",

@@ -6,7 +6,6 @@ import asyncio
 import json
 import sys
 from typing import Any, Mapping
-import urllib.error
 import urllib.request
 
 from .validation import ProtocolError, number
@@ -35,7 +34,7 @@ def _invalid_number(value: str) -> None:
 def _decode(raw: str) -> dict[str, Any]:
     try:
         parsed = json.loads(raw, parse_constant=_invalid_number)
-    except ValueError as exc:
+    except (ValueError, RecursionError) as exc:
         raise ProtocolError("Expected a JSON object response") from exc
     if not isinstance(parsed, dict):
         raise ProtocolError("Expected a JSON object response")
@@ -58,6 +57,8 @@ def request_json_sync(
     timeout: float = 2.0,
 ) -> dict[str, Any]:
     """Make one HTTP request without retrying a potentially accepted step."""
+    from ._http import HTTPFailure, read_response
+
     timeout = timeout_value(timeout)
     req_headers = {"Accept": "application/json", **(headers or {})}
     body = None
@@ -68,19 +69,15 @@ def request_json_sync(
         url, data=body, headers=req_headers, method=method.upper()
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            status = getattr(response, "status", 200)
-            if not 200 <= status < 300:
-                raise TransportError(f"HTTP {status} from {url}", status=status)
-            raw = response.read().decode("utf-8")
-    except urllib.error.HTTPError as exc:
-        raise TransportError(f"HTTP {exc.code} from {url}", status=exc.code) from exc
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        timed_out = isinstance(exc, TimeoutError) or isinstance(
-            getattr(exc, "reason", None), TimeoutError
-        )
+        status, body = read_response(request, timeout)
+        if not 200 <= status < 300:
+            raise TransportError(f"HTTP {status} from {url}", status=status)
+        raw = body.decode("utf-8")
+    except HTTPFailure as exc:
         raise TransportError(
-            f"QTP transport error for {url}: {exc}", timed_out=timed_out
+            f"QTP transport error for {url}: {exc}",
+            status=exc.status,
+            timed_out=exc.timed_out,
         ) from exc
     except UnicodeError as exc:
         raise ProtocolError("Response is not UTF-8 JSON") from exc
@@ -133,7 +130,10 @@ async def _pyfetch_json(
         kwargs["body"] = json.dumps(payload, allow_nan=False)
         req_headers.setdefault("Content-Type", "application/json")
 
+    status = None
+
     async def exchange() -> dict[str, Any]:
+        nonlocal status
         response = await pyfetch(url, **kwargs)
         status = int(response.status)
         if not 200 <= status < 300:
@@ -145,7 +145,7 @@ async def _pyfetch_json(
     except asyncio.TimeoutError as exc:
         controller.abort()
         raise TransportError(
-            f"QTP request timed out after {timeout}s", timed_out=True
+            f"QTP request timed out after {timeout}s", status=status, timed_out=True
         ) from exc
     except asyncio.CancelledError:
         controller.abort()
@@ -153,4 +153,6 @@ async def _pyfetch_json(
     except (TransportError, ProtocolError):
         raise
     except Exception as exc:
-        raise TransportError(f"QTP pyfetch error for {url}: {exc}") from exc
+        raise TransportError(
+            f"QTP pyfetch error for {url}: {exc}", status=status
+        ) from exc

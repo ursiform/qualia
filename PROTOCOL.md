@@ -44,12 +44,19 @@ connection guarantee.
 `GET /api/status` must advertise `"protocol": "qtp/1.0"` and a boolean `"ready"`.
 A generic service's readiness response does not establish QTP compatibility.
 
-Clients default to strict remote operation. Explicit `auto` mode permits local
-fallback for network failures only. HTTP errors, invalid QTP responses, and
-timeouts raise errors without advancing the client's counters. Browser deadlines
-cover both headers and body and abort the request. Aborting does not roll back a
-server operation: after an ambiguous failure, reconcile server state before
-continuing. There are no automatic step retries.
+Clients default to strict remote operation. Explicit `auto` mode checks
+`GET /api/status` before each step and permits local fallback only when that
+check fails to reach the service. The status check must advertise `ready: true`
+before sending a step. A failed POST never triggers fallback: losing a
+connection, even before response headers, does not establish whether the server
+committed the decision. HTTP errors, invalid QTP responses, and timeouts raise
+without advancing the client's counters.
+
+Request deadlines cover both headers and body. On expiry, browser transports
+abort fetch and native Python shuts down the HTTP socket. A native DNS lookup
+may finish in the background; an expired lookup cannot send a late HTTP request.
+Aborting does not roll back a server operation: after an ambiguous failure,
+reconcile server state before continuing. There are no automatic step retries.
 
 ---
 

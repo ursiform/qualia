@@ -36,8 +36,9 @@ class Client:
       :class:`~qualia.transport.TransportError` if the server is unreachable.
     - ``"local"``: Executes the deterministic in-process :class:`~qualia.local.LocalEngine`
       without making network calls.
-    - ``"auto"``: Explicitly permits local decisions on network failure.
-      HTTP, protocol, and timeout failures always raise errors.
+    - ``"auto"``: Checks status before each step and permits local decisions
+      if that check cannot reach the service. Once a step is sent, failures
+      always raise because the remote decision may already be committed.
 
     Remote operation is the default. The local engine is a demonstration policy;
     its pool counts are synthetic and do not measure a remote runtime.
@@ -92,30 +93,29 @@ class Client:
         """Transmit one Percept and optional Consequence and await the resulting Intention."""
         frame, outcome, step_idx = self._prepare_step(percept, consequence)
 
-        if self.mode == "local":
+        local = self.mode == "local"
+        if self.mode == "auto":
+            status = await self.status()
+            local = status["engine"] == "local"
+            if not status["ready"]:
+                raise ProtocolError("QTP service is not ready")
+        if local:
             intention = self.local.step(frame, outcome, step=step_idx, fallback=True)
             self._record_intention(intention, step_idx)
             return intention
 
         payload = self._build_request(frame, outcome, step_idx)
         target_url = f"{self.url}{self.step_path}"
-        try:
-            response = await request_json_async(
-                target_url,
-                method="POST",
-                payload=payload,
-                timeout=self.timeout,
-            )
-            intention = self._parse_intention(response, step_idx)
-            self.local.observe(frame, outcome, action=intention.action, step=step_idx)
-            self._record_intention(intention, step_idx)
-            return intention
-        except TransportError as exc:
-            if self.mode == "remote" or exc.status is not None or exc.timed_out:
-                raise
-            intention = self.local.step(frame, outcome, step=step_idx, fallback=True)
-            self._record_intention(intention, step_idx)
-            return intention
+        response = await request_json_async(
+            target_url,
+            method="POST",
+            payload=payload,
+            timeout=self.timeout,
+        )
+        intention = self._parse_intention(response, step_idx)
+        self.local.observe(frame, outcome, action=intention.action, step=step_idx)
+        self._record_intention(intention, step_idx)
+        return intention
 
     def step_sync(
         self,
@@ -125,30 +125,29 @@ class Client:
         """Synchronous counterpart to :meth:`step` for scripts and CLI drivers."""
         frame, outcome, step_idx = self._prepare_step(percept, consequence)
 
-        if self.mode == "local":
+        local = self.mode == "local"
+        if self.mode == "auto":
+            status = self.status_sync()
+            local = status["engine"] == "local"
+            if not status["ready"]:
+                raise ProtocolError("QTP service is not ready")
+        if local:
             intention = self.local.step(frame, outcome, step=step_idx, fallback=True)
             self._record_intention(intention, step_idx)
             return intention
 
         payload = self._build_request(frame, outcome, step_idx)
         target_url = f"{self.url}{self.step_path}"
-        try:
-            response = request_json_sync(
-                target_url,
-                method="POST",
-                payload=payload,
-                timeout=self.timeout,
-            )
-            intention = self._parse_intention(response, step_idx)
-            self.local.observe(frame, outcome, action=intention.action, step=step_idx)
-            self._record_intention(intention, step_idx)
-            return intention
-        except TransportError as exc:
-            if self.mode == "remote" or exc.status is not None or exc.timed_out:
-                raise
-            intention = self.local.step(frame, outcome, step=step_idx, fallback=True)
-            self._record_intention(intention, step_idx)
-            return intention
+        response = request_json_sync(
+            target_url,
+            method="POST",
+            payload=payload,
+            timeout=self.timeout,
+        )
+        intention = self._parse_intention(response, step_idx)
+        self.local.observe(frame, outcome, action=intention.action, step=step_idx)
+        self._record_intention(intention, step_idx)
+        return intention
 
     async def status(self) -> dict[str, Any]:
         """Fetch server or local engine status asynchronously."""
