@@ -137,6 +137,7 @@ async def _pyfetch_json(
         response = await pyfetch(url, **kwargs)
         status = int(response.status)
         if not 200 <= status < 300:
+            controller.abort()
             raise TransportError(f"HTTP {status} from {url}", status=status)
         return _decode(await response.text())
 

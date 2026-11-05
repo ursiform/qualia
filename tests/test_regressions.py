@@ -6,6 +6,7 @@ import asyncio
 from copy import deepcopy
 import json
 import math
+from pathlib import Path
 import sys
 import types
 import unittest
@@ -70,6 +71,18 @@ class TestFlowAndRetina(unittest.TestCase):
 
 
 class TestClientContract(unittest.TestCase):
+    def test_bias_matches_extreme_and_threshold_reference_cases(self):
+        cases = json.loads((Path(__file__).with_name("bias.json")).read_text())
+        for row in cases:
+            with self.subTest(left=row["left"], right=row["right"]):
+                intention = Intention(
+                    scores={"left": row["left"], "right": row["right"], "forward": 0},
+                    active={"left": 2, "right": 8, "forward": 0},
+                    candidates={"left": 10, "right": 10, "forward": 10},
+                )
+                self.assertTrue(math.isfinite(intention.bias))
+                self.assertEqual(intention.bias, row["bias"])
+
     def test_large_finite_values_survive_wire_serialization(self):
         for value in (2**52, -(2**52), 1e303, 1e308, -1e308, sys.float_info.max):
             consequence = Consequence(reward=value, progress=value, range=abs(value))
@@ -226,6 +239,56 @@ class TestClientContract(unittest.TestCase):
 
 
 class TestTransport(unittest.TestCase):
+    def test_pyodide_http_errors_abort_unread_bodies(self):
+        for status in (403, 404, 503):
+            for operation in ("status", "step"):
+                with self.subTest(status=status, operation=operation):
+                    signal = types.SimpleNamespace(aborted=False)
+                    reads = []
+                    calls = []
+                    response = types.SimpleNamespace(status=status)
+
+                    async def text():
+                        reads.append(True)
+                        await asyncio.Event().wait()
+
+                    response.text = text
+
+                    async def fetch(url, **options):
+                        calls.append(options["method"])
+                        self.assertIs(options["signal"], signal)
+                        return response
+
+                    controller = types.SimpleNamespace(
+                        signal=signal, abort=lambda: setattr(signal, "aborted", True)
+                    )
+                    modules = {
+                        "js": types.SimpleNamespace(
+                            AbortController=types.SimpleNamespace(
+                                new=lambda: controller
+                            )
+                        ),
+                        "pyodide": types.ModuleType("pyodide"),
+                        "pyodide.http": types.SimpleNamespace(pyfetch=fetch),
+                    }
+                    client = connect()
+                    with patch.dict(sys.modules, modules):
+                        with self.assertRaises(TransportError) as raised:
+                            asyncio.run(
+                                client.status()
+                                if operation == "status"
+                                else client.step(Percept())
+                            )
+                    self.assertEqual(raised.exception.status, status)
+                    self.assertFalse(raised.exception.timed_out)
+                    self.assertTrue(signal.aborted)
+                    self.assertEqual(reads, [])
+                    self.assertEqual(
+                        calls, ["GET" if operation == "status" else "POST"]
+                    )
+                    self.assertEqual(client.step_count, 0)
+                    self.assertEqual(client.local.step_count, 0)
+
     def test_pyodide_failed_post_never_falls_back_or_advances(self):
         for failure in ("headers", "body", "parser"):
             with self.subTest(failure=failure):

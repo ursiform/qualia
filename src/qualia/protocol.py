@@ -272,9 +272,13 @@ class Intention:
         """
         left_score = float(self.scores.get("left", 0.0))
         right_score = float(self.scores.get("right", 0.0))
-        score_sum = abs(left_score) + abs(right_score)
-        if score_sum > 1e-9:
-            return _round6(_clamp((right_score - left_score) / score_sum, -1.0, 1.0))
+        scale = max(abs(left_score), abs(right_score))
+        if scale > 0:
+            left, right = left_score / scale, right_score / scale
+            total = abs(left) + abs(right)
+            # Compare the original magnitude without overflowing its sum.
+            if scale > 1e-9 / total:
+                return _round6(_clamp((right - left) / total, -1.0, 1.0))
 
         left_active = float(self.active.get("left", 0))
         right_active = float(self.active.get("right", 0))

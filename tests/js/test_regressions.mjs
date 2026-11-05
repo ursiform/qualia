@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   Client,
@@ -31,6 +32,62 @@ async function withFetch(fetcher, run) {
     globalThis.fetch = original;
   }
 }
+
+test("extreme and threshold score pairs produce the specified finite bias", () => {
+  const cases = JSON.parse(
+    readFileSync(new URL("../bias.json", import.meta.url), "utf8"),
+  );
+  for (const row of cases) {
+    const intention = new Intention({
+      scores: { left: row.left, right: row.right, forward: 0 },
+      active: { left: 2, right: 8, forward: 0 },
+      candidates: { left: 10, right: 10, forward: 10 },
+    });
+    assert.ok(Number.isFinite(intention.bias));
+    assert.equal(intention.bias, row.bias);
+  }
+});
+
+test("HTTP error responses abort unread bodies without waiting for the deadline", async () => {
+  for (const status of [403, 404, 503]) {
+    for (const operation of ["status", "step"]) {
+      let signal;
+      const methods = [];
+      let reads = 0;
+      await withFetch(
+        async (url, options) => {
+          signal = options.signal;
+          methods.push(options.method ?? "GET");
+          return {
+            ok: false,
+            status,
+            text: () => {
+              reads++;
+              return new Promise(() => {});
+            },
+          };
+        },
+        async () => {
+          const client = connect();
+          await assert.rejects(
+            operation === "status"
+              ? client.status()
+              : client.step(new Percept()),
+            (error) =>
+              error instanceof TransportError &&
+              error.status === status &&
+              !error.timedOut,
+          );
+          assert.equal(signal.aborted, true);
+          assert.equal(reads, 0);
+          assert.deepEqual(methods, [operation === "status" ? "GET" : "POST"]);
+          assert.equal(client.stepCount, 0);
+          assert.equal(client.local.stepCount, 0);
+        },
+      );
+    }
+  }
+});
 
 test("large finite numbers survive JSON wire serialization", () => {
   for (const value of [

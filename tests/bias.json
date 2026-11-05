@@ -1,0 +1,77 @@
+[
+  {
+    "left": 1.5e308,
+    "right": 1e308,
+    "bias": -0.2
+  },
+  {
+    "left": 1e308,
+    "right": 1.5e308,
+    "bias": 0.2
+  },
+  {
+    "left": -1e308,
+    "right": 1e308,
+    "bias": 1
+  },
+  {
+    "left": 1e308,
+    "right": -1e308,
+    "bias": -1
+  },
+  {
+    "left": -1.5e308,
+    "right": -1e308,
+    "bias": 0.2
+  },
+  {
+    "left": -1e308,
+    "right": -1.5e308,
+    "bias": -0.2
+  },
+  {
+    "left": 1.7976931348623157e308,
+    "right": 1.7976931348623157e308,
+    "bias": 0
+  },
+  {
+    "left": 0,
+    "right": 1e308,
+    "bias": 1
+  },
+  {
+    "left": 1e308,
+    "right": 0,
+    "bias": -1
+  },
+  {
+    "left": 0,
+    "right": 0,
+    "bias": 0.6
+  },
+  {
+    "left": 5e-10,
+    "right": 5e-10,
+    "bias": 0.6
+  },
+  {
+    "left": 1e-9,
+    "right": 0,
+    "bias": 0.6
+  },
+  {
+    "left": 6e-10,
+    "right": 6e-10,
+    "bias": 0
+  },
+  {
+    "left": 1.0001e-9,
+    "right": 0,
+    "bias": -1
+  },
+  {
+    "left": 0.1,
+    "right": 0.3,
+    "bias": 0.5
+  }
+]

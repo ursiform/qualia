@@ -114,6 +114,29 @@ class TestParity(unittest.TestCase):
                     },
                 }
             )
+        bias_cases = json.loads((root / "tests/bias.json").read_text())
+        for row in bias_cases:
+            cases["wires"].append(
+                {
+                    "kind": "intention",
+                    "value": Intention(
+                        scores={
+                            "left": row["left"],
+                            "right": row["right"],
+                            "forward": 0,
+                        },
+                        active={"left": 2, "right": 8, "forward": 0},
+                        candidates={"left": 10, "right": 10, "forward": 10},
+                    ).to_dict()
+                    | {
+                        "scores": {
+                            "left": row["left"],
+                            "right": row["right"],
+                            "forward": 0,
+                        }
+                    },
+                }
+            )
         for changes in (
             {"action": "fly"},
             {"action": None},

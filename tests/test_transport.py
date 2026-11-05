@@ -62,13 +62,14 @@ class FailureHandler(BaseHTTPRequestHandler):
                 "nested": b'{"x":' * 2000 + b"0" + b"}" * 2000,
                 "slow-body": b" " * 300 + b"{}",
                 "http": b"{}",
+                "http-stream": b" " * 300,
             }[mode]
-            self.send_response(503 if mode == "http" else 200)
+            self.send_response(503 if mode in ("http", "http-stream") else 200)
             self.send_header(
                 "Content-Length", str(100 if mode == "body" else len(body))
             )
             self.end_headers()
-            if mode == "slow-body":
+            if mode in ("slow-body", "http-stream"):
                 self.trickle(body)
             else:
                 self.wfile.write(body)
@@ -178,6 +179,7 @@ class TestHTTPFailures(unittest.TestCase):
             "headers",
             "body",
             "http",
+            "http-stream",
             "json",
             "nested",
             "slow-headers",
@@ -198,6 +200,8 @@ class TestHTTPFailures(unittest.TestCase):
                             result = json.loads(process.stdout)
                         else:
                             result = python_failure(url, language == "async")
+                        if mode == "http-stream":
+                            self.assertTrue(server.disconnected.wait(0.8))
                         rows.append(
                             {**result, "gets": server.gets, "posts": server.posts}
                         )
@@ -228,6 +232,6 @@ class TestHTTPFailures(unittest.TestCase):
                         200
                         if mode in ("body", "slow-body")
                         else 503
-                        if mode == "http"
+                        if mode in ("http", "http-stream")
                         else None,
                     )
