@@ -1,8 +1,10 @@
 """Real HTTP failures must not silently replace committed decisions."""
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import http.client
 import json
 import os
 from pathlib import Path
@@ -20,15 +22,19 @@ from qualia.transport import request_json_sync
 
 class FailureHandler(BaseHTTPRequestHandler):
     def handle(self):
+        self.received = False
         try:
             super().handle()
         finally:
+            if not self.received:
+                self.server.empty_connection.set()
             self.server.finished.set()
 
     def log_message(self, *args):
         pass
 
     def do_GET(self):
+        self.received = True
         self.server.gets += 1
         if self.server.mode == "offline":
             self.connection.shutdown(socket.SHUT_RDWR)
@@ -45,8 +51,11 @@ class FailureHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
-        self.rfile.read(int(self.headers["Content-Length"]))
+        self.received = True
+        payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        self.server.requests.append(payload)
         self.server.posts += 1  # The remote step is now committed.
+        self.server.posted.set()
         mode = self.server.mode
         if mode == "headers":
             self.connection.shutdown(socket.SHUT_RDWR)
@@ -68,6 +77,7 @@ class FailureHandler(BaseHTTPRequestHandler):
             ).encode()
             body = {
                 "body": b"{",
+                "success": wire,
                 "json": b"not JSON",
                 "utf8": wire.replace(b"extra", b"\xc3("),
                 "bom": b"\xef\xbb\xbf" + wire,
@@ -103,6 +113,9 @@ def failure_server(mode):
     with ThreadingHTTPServer(("127.0.0.1", 0), FailureHandler) as server:
         server.mode = mode
         server.gets = server.posts = 0
+        server.requests = []
+        server.posted = Event()
+        server.empty_connection = Event()
         server.disconnected = Event()
         server.finished = Event()
         thread = Thread(
@@ -140,6 +153,124 @@ def python_failure(url, asynchronous):
 
 
 class TestHTTPFailures(unittest.TestCase):
+    def test_cancelled_native_step_cannot_send_after_reset(self):
+        for stage in ("dns", "connected"):
+            with self.subTest(stage=stage), failure_server("success") as (server, url):
+                entered, release = Event(), Event()
+                resolve, send = socket.getaddrinfo, http.client.HTTPConnection.send
+                notify = None
+
+                def signal_started():
+                    entered.set()
+                    notify()
+
+                def delayed_resolve(*args, **kwargs):
+                    if not entered.is_set():
+                        signal_started()
+                        release.wait(2)
+                    return resolve(*args, **kwargs)
+
+                def delayed_send(connection, data):
+                    if not entered.is_set():
+                        if connection.sock is None:
+                            connection.connect()
+                        signal_started()
+                        release.wait(2)
+                    return send(connection, data)
+
+                async def run():
+                    nonlocal notify
+                    loop = asyncio.get_running_loop()
+                    loop.set_default_executor(ThreadPoolExecutor(max_workers=1))
+                    started = asyncio.Event()
+
+                    def notify():
+                        loop.call_soon_threadsafe(started.set)
+
+                    client = connect(url, timeout=2)
+                    task = asyncio.create_task(client.step(Percept(cue="stale")))
+                    try:
+                        await asyncio.wait_for(started.wait(), 1)
+                        task.cancel()
+                        start = monotonic()
+                        with self.assertRaises(asyncio.CancelledError):
+                            await task
+                        self.assertLess(monotonic() - start, 0.5)
+                        self.assertEqual(
+                            (client.step_count, client.local.step_count), (0, 0)
+                        )
+                        client.reset()
+                        # The cancelled request must free the only executor
+                        # slot while its native DNS call is still paused.
+                        fresh = await asyncio.wait_for(
+                            client.step(Percept(cue="fresh")), 0.8
+                        )
+                        self.assertEqual(fresh.step, 0)
+                        release.set()
+                        self.assertTrue(
+                            await asyncio.to_thread(server.empty_connection.wait, 0.8),
+                            [row["percept"]["cue"] for row in server.requests],
+                        )
+                        self.assertEqual(
+                            [row["percept"]["cue"] for row in server.requests],
+                            ["fresh"],
+                        )
+                        self.assertEqual(
+                            (client.step_count, client.local.step_count), (1, 1)
+                        )
+                    finally:
+                        release.set()
+                        if not task.done():
+                            task.cancel()
+                            try:
+                                await task
+                            except asyncio.CancelledError:
+                                pass
+
+                target = (
+                    "socket.getaddrinfo"
+                    if stage == "dns"
+                    else "http.client.HTTPConnection.send"
+                )
+                with (
+                    patch(target, side_effect=delayed_resolve)
+                    if stage == "dns"
+                    else patch(target, new=delayed_send)
+                ):
+                    asyncio.run(run())
+
+    def test_native_cancellation_closes_live_response_sockets(self):
+        for mode in ("slow-headers", "slow-body"):
+            with self.subTest(mode=mode), failure_server(mode) as (server, url):
+
+                async def run():
+                    client = connect(url, timeout=2)
+                    task = asyncio.create_task(client.step(Percept()))
+                    try:
+                        self.assertTrue(await asyncio.to_thread(server.posted.wait, 1))
+                        task.cancel()
+                        start = monotonic()
+                        with self.assertRaises(asyncio.CancelledError):
+                            await task
+                        self.assertLess(monotonic() - start, 0.5)
+                        self.assertTrue(
+                            await asyncio.to_thread(server.disconnected.wait, 0.8)
+                        )
+                        self.assertEqual(server.posts, 1)
+                        self.assertEqual(
+                            (client.step_count, client.local.step_count), (0, 0)
+                        )
+                        client.reset()
+                    finally:
+                        if not task.done():
+                            task.cancel()
+                            try:
+                                await task
+                            except asyncio.CancelledError:
+                                pass
+
+                asyncio.run(run())
+
     def test_expired_dns_lookup_cannot_send_a_late_request(self):
         release = Event()
         started = Event()

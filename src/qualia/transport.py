@@ -5,10 +5,13 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 import urllib.request
 
 from .validation import ProtocolError, number
+
+if TYPE_CHECKING:
+    from ._http import _Exchange
 
 
 class TransportError(RuntimeError):
@@ -62,9 +65,20 @@ def request_json_sync(
     timeout: float = 2.0,
 ) -> dict[str, Any]:
     """Make one HTTP request without retrying a potentially accepted step."""
-    from ._http import HTTPFailure, read_response
-
     timeout = timeout_value(timeout)
+    exchange = _native_exchange(url, method, payload, headers, timeout)
+    return _native_json(exchange)
+
+
+def _native_exchange(
+    url: str,
+    method: str,
+    payload: Mapping[str, Any] | None,
+    headers: Mapping[str, str] | None,
+    timeout: float,
+) -> _Exchange:
+    from ._http import _Exchange
+
     req_headers = {"Accept": "application/json", **(headers or {})}
     body = None
     if payload is not None:
@@ -73,8 +87,15 @@ def request_json_sync(
     request = urllib.request.Request(
         url, data=body, headers=req_headers, method=method.upper()
     )
+    return _Exchange(request, timeout)
+
+
+def _native_json(exchange: _Exchange) -> dict[str, Any]:
+    from ._http import HTTPFailure
+
+    url = exchange.request.full_url
     try:
-        status, body = read_response(request, timeout)
+        status, body = exchange.read()
         if not 200 <= status < 300:
             raise TransportError(f"HTTP {status} from {url}", status=status)
         raw = body.decode("utf-8")
@@ -103,14 +124,12 @@ async def request_json_async(
         return await _pyfetch_json(
             url, method=method, payload=payload, headers=headers, timeout=timeout
         )
-    return await asyncio.to_thread(
-        request_json_sync,
-        url,
-        method=method,
-        payload=payload,
-        headers=headers,
-        timeout=timeout,
-    )
+    exchange = _native_exchange(url, method, payload, headers, timeout)
+    try:
+        return await asyncio.to_thread(_native_json, exchange)
+    except asyncio.CancelledError:
+        exchange.abort()
+        raise
 
 
 async def _pyfetch_json(

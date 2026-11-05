@@ -55,6 +55,9 @@ without advancing the client's counters.
 Request deadlines cover both headers and body. On expiry, browser transports
 abort fetch and native Python shuts down the HTTP socket. A native DNS lookup
 may finish in the background; an expired lookup cannot send a late HTTP request.
+Cancelling an asynchronous Python request aborts its native exchange before
+returning cancellation to the caller, preventing an unsent request from being
+sent later. A request already accepted by the server may still have committed.
 Aborting does not roll back a server operation: after an ambiguous failure,
 reconcile server state before continuing. There are no automatic step retries.
 Reference clients reject overlapping

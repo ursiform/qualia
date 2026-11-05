@@ -17,38 +17,11 @@ class HTTPFailure(Exception):
         self.timed_out = timed_out
 
 
-def read_response(request: urllib.request.Request, timeout: float) -> tuple[int, bytes]:
-    """Return one response, closing its socket when the total deadline expires."""
-    exchange = _Exchange(request, timeout)
-    started = monotonic()
-    Thread(target=exchange.run, daemon=True).start()
-    if not exchange.done.wait(max(0, timeout - (monotonic() - started))):
-        exchange.abort()
-        raise HTTPFailure(
-            f"Request timed out after {timeout}s",
-            status=exchange.status,
-            timed_out=True,
-        )
-    if exchange.error is not None:
-        error = exchange.error
-        if not isinstance(
-            error, (urllib.error.URLError, http.client.HTTPException, OSError)
-        ):
-            raise error
-        raise HTTPFailure(
-            str(error),
-            status=exchange.status,
-            timed_out=isinstance(error, TimeoutError)
-            or isinstance(getattr(error, "reason", None), TimeoutError),
-        ) from error
-    return exchange.status, exchange.body
-
-
 class _Exchange:
     def __init__(self, request, timeout):
         self.request = request
         self.timeout = timeout
-        self.done = Event()
+        self.wake = Event()
         self.lock = Lock()
         self.aborted = False
         self.connection = None
@@ -56,6 +29,35 @@ class _Exchange:
         self.status = None
         self.body = b""
         self.error = None
+
+    def read(self) -> tuple[int, bytes]:
+        """Wait for one response, interruption, or total request deadline."""
+        if self.aborted:
+            raise HTTPFailure("Request cancelled", status=self.status)
+        started = monotonic()
+        Thread(target=self.run, daemon=True).start()
+        if not self.wake.wait(max(0, self.timeout - (monotonic() - started))):
+            self.abort()
+            raise HTTPFailure(
+                f"Request timed out after {self.timeout}s",
+                status=self.status,
+                timed_out=True,
+            )
+        if self.aborted:
+            raise HTTPFailure("Request cancelled", status=self.status)
+        if self.error is not None:
+            error = self.error
+            if not isinstance(
+                error, (urllib.error.URLError, http.client.HTTPException, OSError)
+            ):
+                raise error
+            raise HTTPFailure(
+                str(error),
+                status=self.status,
+                timed_out=isinstance(error, TimeoutError)
+                or isinstance(getattr(error, "reason", None), TimeoutError),
+            ) from error
+        return self.status, self.body
 
     def track(self, connection):
         with self.lock:
@@ -82,7 +84,11 @@ class _Exchange:
                 sock.shutdown(socket.SHUT_RDWR)
             except OSError:
                 pass
-            sock.close()
+            try:
+                sock.close()
+            except OSError:
+                pass
+        self.wake.set()
 
     def run(self):
         try:
@@ -99,7 +105,7 @@ class _Exchange:
         except Exception as exc:
             self.error = exc
         finally:
-            self.done.set()
+            self.wake.set()
 
 
 def _connection(kind, exchange):
