@@ -57,6 +57,9 @@ abort fetch and native Python shuts down the HTTP socket. A native DNS lookup
 may finish in the background; an expired lookup cannot send a late HTTP request.
 Aborting does not roll back a server operation: after an ambiguous failure,
 reconcile server state before continuing. There are no automatic step retries.
+Reference clients reject overlapping
+steps and resets during an active step with `ProtocolError`; await the current
+step before issuing another.
 
 ---
 

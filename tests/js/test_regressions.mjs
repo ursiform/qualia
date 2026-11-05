@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { overlapScenario } from "./sessions.mjs";
 import {
   Client,
   Consequence,
@@ -33,6 +34,89 @@ async function withFetch(fetcher, run) {
   }
 }
 
+test("overlapping steps and resets are rejected before capturing an index", async () => {
+  const result = await overlapScenario();
+  assert.equal(result.overlap, "ProtocolError");
+  assert.equal(result.reset, "ProtocolError");
+  assert.equal(result.calls, 2);
+  assert.deepEqual(result.steps, [0, 1]);
+  assert.equal(result.count, 2);
+  assert.equal(result.localCount, 2);
+  assert.equal(
+    Object.values(result.decisions).reduce((a, b) => a + b, 0),
+    2,
+  );
+});
+
+test("step guard is released after input and response failures", async () => {
+  const replies = [
+    new Response("failure", { status: 503 }),
+    response({}),
+    response(decision()),
+  ];
+  let calls = 0;
+  await withFetch(
+    async () => {
+      calls++;
+      return replies.shift();
+    },
+    async () => {
+      const client = connect();
+      await assert.rejects(client.step({}), ProtocolError);
+      assert.equal(calls, 0);
+      await assert.rejects(client.step(new Percept()), TransportError);
+      await assert.rejects(client.step(new Percept()), ProtocolError);
+      assert.equal(client.stepCount, 0);
+      assert.equal(client.local.stepCount, 0);
+      assert.equal((await client.step(new Percept())).step, 0);
+      assert.equal(calls, 3);
+      client.reset();
+      assert.equal(client.stepCount, 0);
+    },
+  );
+});
+
+test("strict UTF-8 decoding rejects malformed bytes without advancing state", async () => {
+  const template = JSON.stringify({
+    ...decision(),
+    scores: { left: 0, right: 0, forward: 0, extra: 1 },
+  });
+  const [before, after] = template.split("extra");
+  const encode = (value) => new TextEncoder().encode(value);
+  for (const invalid of [
+    [0x80],
+    [0xc3, 0x28],
+    [0xed, 0xa0, 0x80],
+    [0xf0, 0x9f],
+  ]) {
+    const body = new Uint8Array([
+      ...encode(before),
+      ...invalid,
+      ...encode(after),
+    ]);
+    await withFetch(
+      async () => new Response(body),
+      async () => {
+        const client = connect();
+        await assert.rejects(client.step(new Percept()), ProtocolError);
+        assert.equal(client.stepCount, 0);
+        assert.equal(client.local.stepCount, 0);
+      },
+    );
+  }
+  const wire = {
+    ...decision(),
+    scores: { left: 0, right: 0, forward: 0, "café-雪-�": 1 },
+  };
+  await withFetch(
+    async () => response(wire),
+    async () => {
+      const intention = await connect().step(new Percept());
+      assert.deepEqual(intention.toDict(), wire);
+    },
+  );
+});
+
 test("extreme and threshold score pairs produce the specified finite bias", () => {
   const cases = JSON.parse(
     readFileSync(new URL("../bias.json", import.meta.url), "utf8"),
@@ -61,7 +145,7 @@ test("HTTP error responses abort unread bodies without waiting for the deadline"
           return {
             ok: false,
             status,
-            text: () => {
+            arrayBuffer: () => {
               reads++;
               return new Promise(() => {});
             },
@@ -91,6 +175,10 @@ test("HTTP error responses abort unread bodies without waiting for the deadline"
 
 test("large finite numbers survive JSON wire serialization", () => {
   for (const value of [
+    2 ** 33,
+    2 ** 33 + 0.5,
+    100000000000000.5,
+    -100000000000000.5,
     2 ** 52,
     -(2 ** 52),
     1e303,
@@ -128,7 +216,7 @@ test("a failed POST never falls back even without response headers", async () =>
         return {
           ok: true,
           status: 200,
-          text: async () => {
+          arrayBuffer: async () => {
             throw new TypeError("body reset");
           },
         };
@@ -326,7 +414,11 @@ test("timeout covers headers and response body and aborts the request", async ()
         calls += 1;
         signal = options.signal;
         if (stallBody)
-          return { ok: true, status: 200, text: () => new Promise(() => {}) };
+          return {
+            ok: true,
+            status: 200,
+            arrayBuffer: () => new Promise(() => {}),
+          };
         return new Promise(() => {});
       },
       async () => {

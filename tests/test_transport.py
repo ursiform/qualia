@@ -14,7 +14,7 @@ from time import monotonic, sleep
 import unittest
 from unittest.mock import patch
 
-from qualia import Percept, ProtocolError, TransportError, connect
+from qualia import Intention, Percept, ProtocolError, TransportError, connect
 from qualia.transport import request_json_sync
 
 
@@ -56,9 +56,21 @@ class FailureHandler(BaseHTTPRequestHandler):
                 self.wfile.write(b"HTTP/1.1 200 OK\r\nX-Trickle: ")
                 self.trickle(b"x" * 300)
                 return
+            wire = json.dumps(
+                Intention(
+                    scores={
+                        "left": 0,
+                        "right": 0,
+                        "forward": 0,
+                        "extra": 1,
+                    }
+                ).to_dict()
+            ).encode()
             body = {
                 "body": b"{",
                 "json": b"not JSON",
+                "utf8": wire.replace(b"extra", b"\xc3("),
+                "bom": b"\xef\xbb\xbf" + wire,
                 "nested": b'{"x":' * 2000 + b"0" + b"}" * 2000,
                 "slow-body": b" " * 300 + b"{}",
                 "http": b"{}",
@@ -181,6 +193,8 @@ class TestHTTPFailures(unittest.TestCase):
             "http",
             "http-stream",
             "json",
+            "utf8",
+            "bom",
             "nested",
             "slow-headers",
             "slow-body",
@@ -223,7 +237,7 @@ class TestHTTPFailures(unittest.TestCase):
                     self.assertEqual(
                         row["error"],
                         "ProtocolError"
-                        if mode in ("unready", "json", "nested")
+                        if mode in ("unready", "json", "utf8", "bom", "nested")
                         else "TransportError",
                     )
                     self.assertEqual(row["timedOut"], mode.startswith("slow-"))

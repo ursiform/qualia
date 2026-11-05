@@ -31,7 +31,12 @@ def _invalid_number(value: str) -> None:
     raise ValueError(f"Non-finite JSON number: {value}")
 
 
-def _decode(raw: str) -> dict[str, Any]:
+def _decode(raw: str | bytes) -> dict[str, Any]:
+    if isinstance(raw, bytes):
+        try:
+            raw = raw.decode("utf-8")
+        except UnicodeError as exc:
+            raise ProtocolError("Response is not UTF-8 JSON") from exc
     try:
         parsed = json.loads(raw, parse_constant=_invalid_number)
     except (ValueError, RecursionError) as exc:
@@ -139,7 +144,7 @@ async def _pyfetch_json(
         if not 200 <= status < 300:
             controller.abort()
             raise TransportError(f"HTTP {status} from {url}", status=status)
-        return _decode(await response.text())
+        return _decode(await response.bytes())
 
     try:
         return await asyncio.wait_for(exchange(), timeout)

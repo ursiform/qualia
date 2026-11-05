@@ -84,7 +84,18 @@ class TestClientContract(unittest.TestCase):
                 self.assertEqual(intention.bias, row["bias"])
 
     def test_large_finite_values_survive_wire_serialization(self):
-        for value in (2**52, -(2**52), 1e303, 1e308, -1e308, sys.float_info.max):
+        for value in (
+            2**33,
+            2**33 + 0.5,
+            100000000000000.5,
+            -100000000000000.5,
+            2**52,
+            -(2**52),
+            1e303,
+            1e308,
+            -1e308,
+            sys.float_info.max,
+        ):
             consequence = Consequence(reward=value, progress=value, range=abs(value))
             wire = json.loads(json.dumps(consequence.to_dict(), allow_nan=False))
             self.assertEqual(wire["reward"], value)
@@ -239,6 +250,50 @@ class TestClientContract(unittest.TestCase):
 
 
 class TestTransport(unittest.TestCase):
+    def test_pyodide_strict_utf8_rejects_bad_bytes_without_advancing(self):
+        wire = Intention(
+            scores={"left": 0, "right": 0, "forward": 0, "extra": 1}
+        ).to_dict()
+        template = json.dumps(wire).encode()
+        invalid = [
+            template.replace(b"extra", raw)
+            for raw in (
+                b"\x80",
+                b"\xc3(",
+                b"\xed\xa0\x80",
+                b"\xf0\x9f",
+            )
+        ]
+        for raw in invalid:
+            with self.subTest(raw=raw):
+
+                class Response:
+                    status = 200
+
+                    async def bytes(self):
+                        return raw
+
+                async def fetch(*args, **kwargs):
+                    return Response()
+
+                modules = {
+                    "js": types.SimpleNamespace(
+                        AbortController=types.SimpleNamespace(
+                            new=lambda: types.SimpleNamespace(
+                                signal=None, abort=lambda: None
+                            )
+                        )
+                    ),
+                    "pyodide": types.ModuleType("pyodide"),
+                    "pyodide.http": types.SimpleNamespace(pyfetch=fetch),
+                }
+                client = connect()
+                with patch.dict(sys.modules, modules):
+                    with self.assertRaises(ProtocolError):
+                        asyncio.run(client.step(Percept()))
+                self.assertEqual(client.step_count, 0)
+                self.assertEqual(client.local.step_count, 0)
+
     def test_pyodide_http_errors_abort_unread_bodies(self):
         for status in (403, 404, 503):
             for operation in ("status", "step"):
@@ -248,11 +303,11 @@ class TestTransport(unittest.TestCase):
                     calls = []
                     response = types.SimpleNamespace(status=status)
 
-                    async def text():
+                    async def bytes():
                         reads.append(True)
                         await asyncio.Event().wait()
 
-                    response.text = text
+                    response.bytes = bytes
 
                     async def fetch(url, **options):
                         calls.append(options["method"])
@@ -301,12 +356,12 @@ class TestTransport(unittest.TestCase):
                     def __init__(self, method):
                         self.method = method
 
-                    async def text(self):
+                    async def bytes(self):
                         if self.method == "GET":
-                            return json.dumps(READY)
+                            return json.dumps(READY).encode("utf-8")
                         if failure == "body":
                             raise OSError("response body reset")
-                        return "{}"
+                        return b"{}"
 
                 async def fetch(url, **options):
                     calls.append(options["method"])
@@ -393,7 +448,7 @@ class TestTransport(unittest.TestCase):
             class Response:
                 status = 200
 
-                async def text(self):
+                async def bytes(self):
                     await asyncio.Event().wait()
 
             async def fetch(*args, **kwargs):

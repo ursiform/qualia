@@ -168,7 +168,7 @@ class TestClient(unittest.TestCase):
         class _FakeResponse:
             status = 200
 
-            async def text(self) -> str:
+            async def bytes(self) -> bytes:
                 return json.dumps(
                     {
                         "action": "right",
@@ -178,7 +178,7 @@ class TestClient(unittest.TestCase):
                         "scores": {"left": 0.519, "right": 0.696, "forward": 0.546},
                         "fallback": False,
                     }
-                )
+                ).encode("utf-8")
 
         async def _fake_pyfetch(url: str, **kwargs: Any) -> _FakeResponse:
             recorded["url"] = url

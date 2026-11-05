@@ -30,6 +30,10 @@ readouts, not measurements of a remote system. Neither client retries a failed
 step automatically. Reconcile server state after an ambiguous failure before
 continuing; a client reset does not undo a remote step.
 
+Each client processes one step at a time. Await its result before starting the
+next step. Overlapping steps and resets during a step raise `ProtocolError`;
+Python uses the same guard for synchronous and asynchronous calls.
+
 ---
 
 ## Installation

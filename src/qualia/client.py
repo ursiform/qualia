@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from threading import Lock
 from typing import Any, Mapping
 
 from .local import LocalEngine
@@ -67,6 +69,7 @@ class Client:
         self.local = LocalEngine(seed=seed)
         self._step = 0
         self._last_action: Action | None = None
+        self._step_lock = Lock()
 
     @property
     def step_count(self) -> int:
@@ -80,10 +83,11 @@ class Client:
 
     def reset(self) -> None:
         """Reset step counters, local reflex engine, and attached retina buffer."""
-        self._step = 0
-        self._last_action = None
-        self.retina.reset()
-        self.local.reset()
+        with self._exclusive_step():
+            self._step = 0
+            self._last_action = None
+            self.retina.reset()
+            self.local.reset()
 
     async def step(
         self,
@@ -91,31 +95,34 @@ class Client:
         consequence: Consequence | Mapping[str, Any] | None = None,
     ) -> Intention:
         """Transmit one Percept and optional Consequence and await the resulting Intention."""
-        frame, outcome, step_idx = self._prepare_step(percept, consequence)
+        with self._exclusive_step():
+            frame, outcome, step_idx = self._prepare_step(percept, consequence)
 
-        local = self.mode == "local"
-        if self.mode == "auto":
-            status = await self.status()
-            local = status["engine"] == "local"
-            if not status["ready"]:
-                raise ProtocolError("QTP service is not ready")
-        if local:
-            intention = self.local.step(frame, outcome, step=step_idx, fallback=True)
+            local = self.mode == "local"
+            if self.mode == "auto":
+                status = await self.status()
+                local = status["engine"] == "local"
+                if not status["ready"]:
+                    raise ProtocolError("QTP service is not ready")
+            if local:
+                intention = self.local.step(
+                    frame, outcome, step=step_idx, fallback=True
+                )
+                self._record_intention(intention, step_idx)
+                return intention
+
+            payload = self._build_request(frame, outcome, step_idx)
+            target_url = f"{self.url}{self.step_path}"
+            response = await request_json_async(
+                target_url,
+                method="POST",
+                payload=payload,
+                timeout=self.timeout,
+            )
+            intention = self._parse_intention(response, step_idx)
+            self.local.observe(frame, outcome, action=intention.action, step=step_idx)
             self._record_intention(intention, step_idx)
             return intention
-
-        payload = self._build_request(frame, outcome, step_idx)
-        target_url = f"{self.url}{self.step_path}"
-        response = await request_json_async(
-            target_url,
-            method="POST",
-            payload=payload,
-            timeout=self.timeout,
-        )
-        intention = self._parse_intention(response, step_idx)
-        self.local.observe(frame, outcome, action=intention.action, step=step_idx)
-        self._record_intention(intention, step_idx)
-        return intention
 
     def step_sync(
         self,
@@ -123,31 +130,34 @@ class Client:
         consequence: Consequence | Mapping[str, Any] | None = None,
     ) -> Intention:
         """Synchronous counterpart to :meth:`step` for scripts and CLI drivers."""
-        frame, outcome, step_idx = self._prepare_step(percept, consequence)
+        with self._exclusive_step():
+            frame, outcome, step_idx = self._prepare_step(percept, consequence)
 
-        local = self.mode == "local"
-        if self.mode == "auto":
-            status = self.status_sync()
-            local = status["engine"] == "local"
-            if not status["ready"]:
-                raise ProtocolError("QTP service is not ready")
-        if local:
-            intention = self.local.step(frame, outcome, step=step_idx, fallback=True)
+            local = self.mode == "local"
+            if self.mode == "auto":
+                status = self.status_sync()
+                local = status["engine"] == "local"
+                if not status["ready"]:
+                    raise ProtocolError("QTP service is not ready")
+            if local:
+                intention = self.local.step(
+                    frame, outcome, step=step_idx, fallback=True
+                )
+                self._record_intention(intention, step_idx)
+                return intention
+
+            payload = self._build_request(frame, outcome, step_idx)
+            target_url = f"{self.url}{self.step_path}"
+            response = request_json_sync(
+                target_url,
+                method="POST",
+                payload=payload,
+                timeout=self.timeout,
+            )
+            intention = self._parse_intention(response, step_idx)
+            self.local.observe(frame, outcome, action=intention.action, step=step_idx)
             self._record_intention(intention, step_idx)
             return intention
-
-        payload = self._build_request(frame, outcome, step_idx)
-        target_url = f"{self.url}{self.step_path}"
-        response = request_json_sync(
-            target_url,
-            method="POST",
-            payload=payload,
-            timeout=self.timeout,
-        )
-        intention = self._parse_intention(response, step_idx)
-        self.local.observe(frame, outcome, action=intention.action, step=step_idx)
-        self._record_intention(intention, step_idx)
-        return intention
 
     async def status(self) -> dict[str, Any]:
         """Fetch server or local engine status asynchronously."""
@@ -194,6 +204,15 @@ class Client:
             if self.mode == "remote" or exc.status is not None or exc.timed_out:
                 raise
             return {**self.local.status(), "fallback": True}
+
+    @contextmanager
+    def _exclusive_step(self):
+        if not self._step_lock.acquire(blocking=False):
+            raise ProtocolError("A client step is already in progress")
+        try:
+            yield
+        finally:
+            self._step_lock.release()
 
     def _prepare_step(
         self,
