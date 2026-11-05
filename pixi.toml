@@ -1,0 +1,30 @@
+[workspace]
+name = "qualia"
+version = "0.3.0"
+description = "Qualia Transmission Protocol (QTP) and sensorimotor client"
+authors = ["Afshin T. Darian <qualia@darian.at>"]
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "osx-64", "linux-64", "win-64"]
+
+[dependencies]
+python = ">=3.10"
+nodejs = ">=20"
+pip = "*"
+python-build = "*"
+hatchling = "*"
+pytest = "*"
+twine = "*"
+jupyter_server = ">=2.0.0"
+jupyterlite-core = ">=0.4.0"
+jupyterlite-pyodide-kernel = ">=0.4.0"
+
+[tasks]
+reference = { cmd = "PYTHONPATH=src python -m qualia.server --port 8001 --origin http://127.0.0.1:8000 --origin http://localhost:8000" }
+test = { cmd = "pytest -v" }
+test-py = { cmd = "PYTHONPATH=src python -m unittest discover -s tests -v" }
+test-js = { cmd = "node --test tests/js/test_qtp.mjs tests/js/test_regressions.mjs" }
+check = { depends-on = ["test-py", "test-js"] }
+build-wheel = { cmd = "python -m build --wheel --no-isolation" }
+build-lite = { cmd = "jupyter lite build --config lite/jupyter_lite_config.json", depends-on = ["build-wheel"] }
+serve-lite = { cmd = "jupyter lite serve --config lite/jupyter_lite_config.json --port 8000", depends-on = ["build-lite"] }
+lite = { depends-on = ["serve-lite"] }

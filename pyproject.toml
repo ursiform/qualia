@@ -1,0 +1,83 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "qualia"
+version = "0.3.0"
+description = "Qualia Transmission Protocol (QTP) and pure-Python sensorimotor client"
+readme = "README.md"
+license = "BSD-3-Clause"
+requires-python = ">=3.10"
+authors = [
+    { name = "Afshin T. Darian", email = "qualia@darian.at" },
+]
+keywords = [
+    "qualia",
+    "qtp",
+    "protocol",
+    "sensorimotor",
+    "robotics",
+    "pyodide",
+    "jupyterlite",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: System :: Hardware :: Hardware Drivers",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "jsonschema>=4.18",
+    "openapi-spec-validator>=0.7.2,<0.8",
+]
+lite = [
+    "jupyter-server>=2.0.0",
+    "jupyterlite-core>=0.4.0",
+    "jupyterlite-pyodide-kernel>=0.4.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ursiform/qualia"
+Repository = "https://github.com/ursiform/qualia"
+Documentation = "https://github.com/ursiform/qualia/blob/main/PROTOCOL.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qualia"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/.github/workflows",
+    "/.gitignore",
+    "/LICENSE",
+    "/PROTOCOL.md",
+    "/README.md",
+    "/lib",
+    "/lite",
+    "/package.json",
+    "/pixi.lock",
+    "/pixi.toml",
+    "/pyproject.toml",
+    "/src/qualia",
+    "/tests",
+    "/tools",
+    "/tsconfig.json",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

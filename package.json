@@ -1,18 +1,58 @@
 {
-  "devDependencies": {
-    "lerna": "^3.20.2",
-    "prettier": "^2.0.4",
-    "tslint": "^6.1.1",
-    "tslint-plugin-prettier": "^2.1.0",
-    "typescript": "^3.7.4",
-    "yarn": "^1.22.4"
+  "name": "qualia",
+  "version": "0.3.0",
+  "description": "Qualia Transmission Protocol (QTP) and sensorimotor client for TypeScript and JavaScript",
+  "license": "BSD-3-Clause",
+  "author": "Afshin T. Darian <qualia@darian.at>",
+  "homepage": "https://github.com/ursiform/qualia#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ursiform/qualia.git"
   },
-  "name": "root",
-  "private": true,
+  "bugs": {
+    "url": "https://github.com/ursiform/qualia/issues"
+  },
+  "keywords": [
+    "qualia",
+    "qtp",
+    "protocol",
+    "sensorimotor",
+    "robotics",
+    "web-bluetooth",
+    "typescript"
+  ],
+  "type": "module",
+  "main": "./lib/index.js",
+  "module": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./schema.json": "./src/qualia/qtp.v1.schema.json",
+    "./openapi.json": "./src/qualia/openapi.json"
+  },
+  "files": [
+    "lib/*.js",
+    "lib/index.d.ts",
+    "src/qualia/qtp.v1.schema.json",
+    "PROTOCOL.md",
+    "README.md",
+    "LICENSE",
+    "src/qualia/openapi.json"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
-    "build": "lerna bootstrap && lerna run build"
+    "test": "node --test tests/js/test_qtp.mjs tests/js/test_regressions.mjs",
+    "typecheck": "npx --yes --package typescript@5.6.3 tsc --noEmit",
+    "build:lite": "jupyter lite build --config lite/jupyter_lite_config.json",
+    "serve:lite": "jupyter lite serve --config lite/jupyter_lite_config.json",
+    "generate:schema": "python3 tools/schema.py"
   },
-  "workspaces": [
-    "packages/*"
-  ]
+  "publishConfig": {
+    "access": "public"
+  }
 }
