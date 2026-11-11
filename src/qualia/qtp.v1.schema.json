@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ursiform/qualia/blob/main/src/qualia/qtp.v1.schema.json",
+  "title": "Qualia Transmission Protocol (QTP v1)",
+  "description": "Wire schema for sensorimotor Percept, Consequence, and Intention envelopes in QTP v1.",
+  "type": "object",
+  "$defs": {
+    "Action": {
+      "type": "string",
+      "enum": ["left", "right", "forward", "still"]
+    },
+    "Phase": {
+      "type": "string",
+      "enum": ["sample", "neutral", "choice", "visible"]
+    },
+    "Percept": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height", "rgb", "step", "phase"],
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 64,
+          "maximum": 9007199254740991
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 48,
+          "maximum": 9007199254740991
+        },
+        "rgb": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "description": "Base64-encoded row-major uint8 RGB byte buffer of length width * height * 3."
+        },
+        "step": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "maximum": 9007199254740991
+        },
+        "phase": {
+          "$ref": "#/$defs/Phase",
+          "default": "visible"
+        },
+        "cue": {
+          "type": ["string", "null"],
+          "default": null
+        }
+      }
+    },
+    "Consequence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted",
+        "blocked",
+        "success",
+        "reward",
+        "progress",
+        "range"
+      ],
+      "properties": {
+        "accepted": {
+          "type": "boolean",
+          "default": true
+        },
+        "blocked": {
+          "type": "boolean",
+          "default": false
+        },
+        "success": {
+          "type": "boolean",
+          "default": false
+        },
+        "reward": {
+          "type": "number",
+          "default": 0.0
+        },
+        "progress": {
+          "type": "number",
+          "default": 0.0
+        },
+        "range": {
+          "type": "number",
+          "minimum": 0.0,
+          "default": 0.0
+        }
+      }
+    },
+    "Intention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "step",
+        "active",
+        "candidates",
+        "scores",
+        "fallback"
+      ],
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/Action"
+        },
+        "step": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "active": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "required": ["left", "right", "forward"]
+        },
+        "candidates": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "required": ["left", "right", "forward"]
+        },
+        "scores": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "required": ["left", "right", "forward"]
+        },
+        "fallback": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "StepRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "step", "percept"],
+      "properties": {
+        "protocol": {
+          "type": "string",
+          "const": "qtp/1.0"
+        },
+        "step": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "percept": {
+          "$ref": "#/$defs/Percept"
+        },
+        "consequence": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Consequence"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "action": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Action"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "step": {
+                "const": 0
+              }
+            },
+            "required": ["step"]
+          },
+          "then": {
+            "properties": {
+              "action": {
+                "type": "null"
+              },
+              "consequence": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "required": ["action"],
+            "properties": {
+              "action": {
+                "$ref": "#/$defs/Action"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "StepResponse": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Intention"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["intention"],
+          "properties": {
+            "intention": {
+              "$ref": "#/$defs/Intention"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/StepRequest"
+    },
+    {
+      "$ref": "#/$defs/StepResponse"
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+name: Publish to PyPI and npm
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Verify Python & TypeScript Suites
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install contract validators
+        run: python -m pip install ".[test]"
+      - name: Run Python tests
+        run: PYTHONPATH=src python -m unittest discover -s tests -v
+      - name: Run Node tests and TypeScript check
+        run: |
+          npm test
+          npx --yes --package typescript@5.6.3 tsc --noEmit
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/qualia
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build Python distributions
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+      - name: Publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-npm:
+    name: Publish to npm
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+      - name: Publish package to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
