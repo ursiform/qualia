@@ -26,10 +26,10 @@ conformance.
 
 Browser-hosted peripherals need an explicitly allowed origin on the QTP
 adapter, including its OPTIONS preflight. For example, an adapter configured to
-trust `https://notebook.link` can return:
+trust `https://notebook.example` can return:
 
 ```http
-Access-Control-Allow-Origin: https://notebook.link
+Access-Control-Allow-Origin: https://notebook.example
 Vary: Origin
 Access-Control-Allow-Methods: GET, POST, OPTIONS
 Access-Control-Allow-Headers: Content-Type, Accept
@@ -60,9 +60,8 @@ returning cancellation to the caller, preventing an unsent request from being
 sent later. A request already accepted by the server may still have committed.
 Aborting does not roll back a server operation: after an ambiguous failure,
 reconcile server state before continuing. There are no automatic step retries.
-Reference clients reject overlapping
-steps and resets during an active step with `ProtocolError`; await the current
-step before issuing another.
+Reference clients reject overlapping steps and resets during an active step
+with `ProtocolError`; await the current step before issuing another.
 
 ---
 
