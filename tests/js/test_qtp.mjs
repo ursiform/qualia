@@ -34,7 +34,7 @@ test("Percept and Consequence roundtrip over QTP wire format", () => {
 });
 
 test("Client local reflex loop and Intention bias", async () => {
-  assert.equal(VERSION, "0.3.0");
+  assert.equal(VERSION, "0.4.0");
   assert.equal(QTP_VERSION, "qtp/1.0");
 
   const client = connect("http://127.0.0.1:8001", "local");

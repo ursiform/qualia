@@ -2,7 +2,7 @@
  * TypeScript definitions for the Qualia Transmission Protocol (QTP v1).
  */
 
-export const VERSION = "0.3.0";
+export const VERSION = "0.4.0";
 export const QTP_VERSION = "qtp/1.0";
 export const DEFAULT_WIDTH = 64;
 export const DEFAULT_HEIGHT = 48;

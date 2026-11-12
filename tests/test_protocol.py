@@ -138,12 +138,12 @@ class TestProtocol(unittest.TestCase):
         import json
 
         pkg_json = json.loads((repo_root / "package.json").read_text(encoding="utf-8"))
-        self.assertEqual(qualia.__version__, "0.3.0")
+        self.assertEqual(qualia.__version__, "0.4.0")
         self.assertEqual(pkg_json["version"], qualia.__version__)
 
         dts_text = (repo_root / "lib/index.d.ts").read_text(encoding="utf-8")
         for symbol in (
-            'VERSION = "0.3.0"',
+            'VERSION = "0.4.0"',
             "export interface PerceptWire",
             "export interface ConsequenceWire",
             "export interface IntentionWire",
