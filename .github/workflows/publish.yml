@@ -10,11 +10,11 @@ jobs:
     name: Verify Python & TypeScript Suites
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
       - name: Install contract validators
@@ -24,7 +24,7 @@ jobs:
       - name: Run Node tests and TypeScript check
         run: |
           npm test
-          npx --yes --package typescript@5.6.3 tsc --noEmit
+          npm run typecheck
 
   publish-pypi:
     name: Publish to PyPI
@@ -37,8 +37,8 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Build Python distributions
@@ -56,8 +56,8 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
