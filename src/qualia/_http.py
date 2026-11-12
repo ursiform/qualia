@@ -32,32 +32,34 @@ class _Exchange:
 
     def read(self) -> tuple[int, bytes]:
         """Wait for one response, interruption, or total request deadline."""
-        if self.aborted:
-            raise HTTPFailure("Request cancelled", status=self.status)
+        with self.lock:
+            if self.aborted:
+                raise HTTPFailure("Request cancelled", status=self.status)
         started = monotonic()
         Thread(target=self.run, daemon=True).start()
         if not self.wake.wait(max(0, self.timeout - (monotonic() - started))):
-            self.abort()
+            status = self.abort()
             raise HTTPFailure(
                 f"Request timed out after {self.timeout}s",
-                status=self.status,
+                status=status,
                 timed_out=True,
             )
-        if self.aborted:
-            raise HTTPFailure("Request cancelled", status=self.status)
-        if self.error is not None:
-            error = self.error
+        with self.lock:
+            if self.aborted:
+                raise HTTPFailure("Request cancelled", status=self.status)
+            error, status, body = self.error, self.status, self.body
+        if error is not None:
             if not isinstance(
                 error, (urllib.error.URLError, http.client.HTTPException, OSError)
             ):
                 raise error
             raise HTTPFailure(
                 str(error),
-                status=self.status,
+                status=status,
                 timed_out=isinstance(error, TimeoutError)
                 or isinstance(getattr(error, "reason", None), TimeoutError),
             ) from error
-        return self.status, self.body
+        return status, body
 
     def track(self, connection):
         with self.lock:
@@ -77,6 +79,7 @@ class _Exchange:
         with self.lock:
             self.aborted = True
             sock = self.socket or getattr(self.connection, "sock", None)
+            status = self.status
         if sock is not None:
             # shutdown interrupts a reader in another thread; close alone may
             # leave the socket alive through HTTPResponse's buffered file.
@@ -89,6 +92,7 @@ class _Exchange:
             except OSError:
                 pass
         self.wake.set()
+        return status
 
     def run(self):
         try:
@@ -96,14 +100,25 @@ class _Exchange:
                 _HTTPHandler(self), _HTTPSHandler(self)
             )
             with opener.open(self.request, timeout=self.timeout) as response:
-                self.status = response.status
-                self.body = response.read()
+                with self.lock:
+                    if self.aborted:
+                        return
+                    self.status = response.status
+                body = response.read()
+                with self.lock:
+                    if self.aborted:
+                        return
+                    self.body = body
         except urllib.error.HTTPError as exc:
-            self.status = exc.code
-            self.error = exc
+            with self.lock:
+                if not self.aborted:
+                    self.status = exc.code
+                    self.error = exc
             exc.close()
         except Exception as exc:
-            self.error = exc
+            with self.lock:
+                if not self.aborted:
+                    self.error = exc
         finally:
             self.wake.set()
 

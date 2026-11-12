@@ -304,6 +304,9 @@ class TestHTTPFailures(unittest.TestCase):
                         result = python_failure(url, asynchronous)
                         self.assertLess(monotonic() - start, 0.8)
                         self.assertEqual(result["error"], "TransportError")
+                        self.assertEqual(
+                            result["status"], 200 if mode == "slow-body" else None
+                        )
                         self.assertTrue(result["timedOut"])
                         self.assertEqual(result["steps"], 0)
                         self.assertEqual(server.posts, 1)
@@ -312,6 +315,8 @@ class TestHTTPFailures(unittest.TestCase):
     def test_python_and_javascript_failure_classification_and_state_match(self):
         root = Path(__file__).resolve().parents[1]
         node = os.environ.get("QUALIA_NODE") or shutil.which("node")
+        if not node and (root / ".pixi/envs/default/bin/node").exists():
+            node = str(root / ".pixi/envs/default/bin/node")
         if not node:
             if os.environ.get("CI"):
                 self.fail("Node is required for HTTP failure parity")
