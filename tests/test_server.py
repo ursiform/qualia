@@ -210,7 +210,7 @@ class TestServer(unittest.TestCase):
                 connection.close()
 
     def test_browser_origin_and_preflight_are_explicit_and_scoped(self):
-        origin = "https://notebook.link"
+        origin = "https://notebook.example"
         with running_server(origins=(origin,)) as server:
             headers = {
                 "Origin": origin,
@@ -273,7 +273,7 @@ class TestServer(unittest.TestCase):
             {"port": 65536},
             {"origins": ("*",)},
             {"origins": ("null",)},
-            {"origins": ("https://notebook.link/path",)},
+            {"origins": ("https://notebook.example/path",)},
         ):
             with self.subTest(options=options):
                 with self.assertRaises(ValueError):

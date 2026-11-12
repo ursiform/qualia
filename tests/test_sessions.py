@@ -63,7 +63,10 @@ class TestSessions(unittest.TestCase):
         self.assertEqual(expected["steps"], [0, 1])
         self.assertEqual((expected["count"], expected["localCount"]), (2, 2))
         self.assertEqual(sum(expected["decisions"].values()), 2)
+        root = Path(__file__).resolve().parents[1]
         node = os.environ.get("QUALIA_NODE") or shutil.which("node")
+        if not node and (root / ".pixi/envs/default/bin/node").exists():
+            node = str(root / ".pixi/envs/default/bin/node")
         if not node:
             if os.environ.get("CI"):
                 self.fail("Node is required for session parity")

@@ -128,7 +128,7 @@ class TestOpenAPIExchange(unittest.TestCase):
                 self.validate(value, definition)
 
     def test_real_http_success_and_error_bodies_follow_openapi(self):
-        origin = "https://notebook.link"
+        origin = "https://notebook.example"
         with running_server(origins=(origin,)) as server:
             for path in ("/api/status", "/openapi.json"):
                 code, _, body = request(server, "GET", path)
