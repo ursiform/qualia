@@ -23,7 +23,7 @@ from .specification import openapi
 from .transport import TransportError, is_pyodide
 from .validation import ProtocolError
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     "Action",

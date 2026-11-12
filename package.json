@@ -1,6 +1,6 @@
 {
   "name": "qualia",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Qualia Transmission Protocol (QTP) and sensorimotor client for TypeScript and JavaScript",
   "license": "BSD-3-Clause",
   "author": "Afshin T. Darian <qualia@darian.at>",
